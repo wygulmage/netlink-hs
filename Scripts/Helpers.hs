@@ -1,13 +1,15 @@
-module Main where
+module Scripts.Helpers
+(mkIncludeBlock, getDefinitions, getEnums, selectDefines, selectEnum, mkEnum,
+mkFlag)
+where
 
 import Control.Applicative ((<$>))
-import Control.Arrow ((&&&))
 import Control.Monad (join)
 import Data.Char (isNumber, toLower, toUpper)
 import Data.Function (on)
-import Data.List (intersperse, isPrefixOf, isInfixOf, notElem, sortBy)
+import Data.List (isPrefixOf, isInfixOf, notElem, sortBy)
 import Data.Map (Map, elems, filterWithKey, fromList,
-                 keys, mapKeys, toList, union)
+                 keys, mapKeys, toList)
 import Data.Maybe (mapMaybe)
 import Language.C.Analysis (runTrav_)
 import Language.C.Analysis.AstAnalysis (analyseAST)
@@ -15,61 +17,13 @@ import Language.C.Analysis.SemRep (GlobalDecls(..), TagDef(EnumDef),
                                    EnumType(..), Enumerator(..))
 import Language.C.Data.Ident (Ident(..))
 import Language.C.Data.InputStream (inputStreamFromString)
-import Language.C.Data.Position (Position(..))
+import Language.C.Data.Position (Position(..), position)
 import Language.C.Parser (parseC)
 import Language.C.Pretty (pretty)
 import Language.C.Syntax.Constants (getCInteger)
-import Language.C.Syntax.AST (CExpr(..), CConst(CIntConst), CBinaryOp(..))
-import System.Environment (getArgs)
+import Language.C.Syntax.AST (CExpression(..), CExpr(..), CConstant(CIntConst), CBinaryOp(..))
 import System.Process (readProcess)
 import Text.Regex.PCRE ((=~))
-
-main = do
-    [out] <- getArgs
-    let inc = mkIncludeBlock includeFiles
-    defines <- getDefinitions inc
-    enums <- getEnums inc
-    let (exports, definitions) = outputs defines enums
-        prelude = [
-            "{-# LANGUAGE GeneralizedNewtypeDeriving #-}",
-            "module System.Linux.Netlink.Constants (" ++
-            join (intersperse ", " $ join exports) ++
-            ") where",
-            "",
-            "import Data.Bits",
-            ""]
-    writeFile out $ unlines (prelude ++ join definitions)
-
-outputs :: Map String Integer -> [Map String Integer] -> ([[String]], [[String]])
-outputs d e = let define r = selectDefines r d
-                  enum r = selectEnum r e
-              in map fst &&& map snd $
-    [mkEnum "AddressFamily" $ define "^AF_",
-     mkEnum "MessageType" $
-       union (define "^NLMSG_(?!ALIGNTO)") (enum "^RTM_"),
-     mkFlag "MessageFlags"  $ define "^NLM_F_",
-     mkEnum "LinkType"      $ define "^ARPHRD_",
-     mkFlag "LinkFlags"     $ define "^IFF_",
-     mkEnum "LinkAttrType"  $ enum   "^IFLA_",
-     mkFlag "AddrFlags"     $ define "^IFA_F_",
-     mkEnum "Scope"         $ enum   "^RT_SCOPE_",
-     mkEnum "AddrAttrType"  $ enum   "^IFA_",
-     mkEnum "RouteTableId"  $ enum   "^RT_TABLE_",
-     mkEnum "RouteProto"    $ define "^RTPROT_",
-     mkEnum "RouteType"     $ enum   "^RTN_",
-     mkFlag "RouteFlags"    $ define "^RTM_F_",
-     mkEnum "RouteAttrType" $ enum   "^RTA_"]
-
-includeFiles :: [String]
-includeFiles = [ "sys/types.h"
-               , "sys/socket.h"
-               , "linux/if.h"
-               , "linux/if_tun.h"
-               , "linux/if_arp.h"
-               , "linux/if_link.h"
-               , "linux/netlink.h"
-               , "linux/rtnetlink.h"
-               ]
 
 mkIncludeBlock :: [String] -> String
 mkIncludeBlock = unlines . map (\e -> "#include <" ++ e ++ ">")
@@ -115,7 +69,7 @@ getEnums source = do
     check (Left err) = error $ show err
     check (Right a)   = a
     preprocessed = readProcess "gcc" ["-E", "-"] source
-    initPos = Position "" 0 0
+    initPos = position 0 "" 0 0
     getEnum (EnumDef (EnumType _ es _ _)) = Just $ map getEnumValue es
     getEnum _                             = Nothing
     getEnumValue (Enumerator (Ident s _ _) v _ _) = (s, evalCExpr v)
@@ -124,7 +78,15 @@ getEnums source = do
 evalCExpr :: CExpr -> Integer
 evalCExpr (CConst (CIntConst v _)) = getCInteger v
 evalCExpr (CBinary CAddOp a b _)   = (evalCExpr a) + (evalCExpr b)
-evalCExpr other                    = error $ show (pretty other)
+evalCExpr (CBinary CShlOp a b _)   = (evalCExpr a) * (2 ^ (evalCExpr b))
+evalCExpr other                    = error $ "Other: " ++ show (pretty other)
+
+
+sanitize :: [[String]] -> [[String]]
+sanitize (("@define":n:[]):x:[y]:xs) = ["@define",n,y]:(sanitize xs)
+sanitize (("@define":x:y:[]):xs) = ["@define",x,y]:(sanitize xs)
+sanitize (_:xs) = sanitize xs
+sanitize [] = []
 
 getDefinitions :: String -> IO (Map String Integer)
 getDefinitions headers = do
@@ -139,7 +101,7 @@ getDefinitions headers = do
                            (all isNumber (d !! 2) ||
                             "0x" `isPrefixOf` (d !! 2) &&
                             all isNumber (drop 2 (d !! 2))))
-        realDefines = map (take 2 . drop 1) $ filter isInteresting defines2
+        realDefines = map (take 2 . drop 1) $ filter isInteresting $ sanitize defines2
         clean [k,v] = (init (tail k), read v)
     return $ fromList (map clean realDefines)
   where readDefines = readProcess "gcc" ["-E", "-dM", "-"]
