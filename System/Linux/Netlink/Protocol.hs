@@ -272,15 +272,25 @@ putGenericPacket (GenericPacket header custom attributes) =
 putGenericPacket _ = error "Cannot convert this for transmission"
 
 
+getError :: (Convertable a, Eq a, Show a) => Header -> Get (GenericPacket a)
+getError hdr = do
+  code <- fromIntegral <$> getWord32host
+  packet <- getGenPacket
+  return $GenericError hdr code packet
+
+getGenPacketContent :: (Convertable a, Eq a, Show a) => Header -> Get (GenericPacket a)
+getGenPacketContent hdr
+  | messageType hdr == eNLMSG_DONE  = skip 4 >> (return $GenericDoneMsg hdr)
+  | messageType hdr == eNLMSG_ERROR = getError hdr
+  | otherwise  = do
+      msg    <- getGet (messageType hdr)
+      attrs  <- getAttributes
+      return $ GenericPacket hdr msg attrs
 
 getGenPacket :: (Convertable a, Eq a, Show a) => Get (GenericPacket a)
 getGenPacket = do
     (len, header) <- getHeader
-    isolate len $ do
-        msg    <- getGet (messageType header)
-        attrs  <- getAttributes
-        return $ GenericPacket header msg attrs
-
+    isolate len $ getGenPacketContent header
 
 getGenericPackets :: (Convertable a, Eq a, Show a) => ByteString -> Either String [GenericPacket a]
 getGenericPackets bytes = flip runGet bytes $ do
