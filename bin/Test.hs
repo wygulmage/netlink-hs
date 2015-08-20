@@ -11,7 +11,8 @@ import Data.Char (ord)
 
 import System.Linux.Netlink.Internal
 
-main = do
+
+old = do
     sock <- makeSocket
 
     let flags   = foldr (.|.) 0 [fNLM_F_REQUEST]
@@ -27,6 +28,28 @@ main = do
     print $ getLinkMTU attrs
     print $ getLinkQDisc attrs
     print $ getLinkTXQLen attrs
+
+new = do
+    sock <- makeSocket
+    let flags   = foldr (.|.) 0 [fNLM_F_REQUEST]
+        header  = Header eRTM_GETLINK flags 42 0
+        message = NLinkMsg 0 2 0
+        attrs   = empty
+    iface <- queryOneN sock (GenericPacket header message attrs)
+    let attrs = genericPacketAttributes iface
+    print $ getLinkAddress attrs
+    print $ getLinkBroadcast attrs
+    print $ getLinkName attrs
+    print $ getLinkMTU attrs
+    print $ getLinkQDisc attrs
+    print $ getLinkTXQLen attrs
+
+
+main = do
+    putStrLn "Old: "
+    old
+    putStrLn "New: "
+    new
 
 dumpNumeric :: ByteString -> IO ()
 dumpNumeric b = print $ unpack b

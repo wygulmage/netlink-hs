@@ -4,6 +4,9 @@ module System.Linux.Netlink.Protocol
     , Message(..)
     , Attributes
     , Packet(..)
+    , GenericPacket(..)
+    , NMessage(..)
+    , Convertable(..)
     
     , getPacket
     , putPacket
@@ -12,6 +15,10 @@ module System.Linux.Netlink.Protocol
     , getHeader
     , putHeader
     , putAttributes
+
+    , getNPackets
+    , putGenericPacket
+    , getGenericPackets
     ) where
 
 import Prelude hiding (length)
@@ -57,7 +64,50 @@ data Message = DoneMsg
     , addrInterfaceIndex :: Word32
     } deriving (Eq, Show)
 
+data NMessage = NLinkMsg
+    {
+      ninterfaceType  :: LinkType
+    , ninterfaceIndex :: Word32
+    , ninterfaceFlags :: Word32
+    }
+             | NAddrMsg
+    {
+      naddrFamily         :: AddressFamily
+    , naddrMaskLength     :: Word8
+    , naddrFlags          :: Word8
+    , naddrScope          :: Word8
+    , naddrInterfaceIndex :: Word32
+    } deriving (Eq, Show)
+
 type Attributes = Map Int ByteString
+
+class Convertable a where
+  getGet :: MessageType -> Get a
+  getPut :: a -> Put
+
+instance Convertable NMessage where
+  getGet = getNMessage
+  getPut = putNMessage
+
+data GenericPacket a = GenericPacket
+    {
+      genericPacketHeader     :: Header
+    , genericPacketCustom     :: a
+    , genericPacketAttributes :: Attributes
+    }
+        | GenericError
+    {
+      genericPacketHeader     :: Header
+    , genericErrorcode        :: CInt
+    , genericErrorPacket      :: GenericPacket a
+    }
+        | GenericDoneMsg
+    {
+      genericPacketHeader     :: Header
+    }
+    deriving (Eq, Show)
+
+type NPacket = GenericPacket NMessage
 
 data Packet = Packet
     {
@@ -167,6 +217,79 @@ getMessageAddr = do
     scope <- fromIntegral <$> g8
     idx <- g32
     return $ AddrMsg fam maskLen flags scope idx
+--
+-- New generic stuffs
+--
+
+getNMessage :: MessageType -> Get NMessage
+getNMessage msgtype | msgtype == eRTM_NEWLINK = getNMessageLink
+                    | msgtype == eRTM_GETLINK = getNMessageLink
+                    | msgtype == eRTM_DELLINK = getNMessageLink
+                    | msgtype == eRTM_NEWADDR = getNMessageAddr
+                    | msgtype == eRTM_GETADDR = getNMessageAddr
+                    | msgtype == eRTM_DELADDR = getNMessageAddr
+                    | otherwise               =
+                        error $ "Can't decode message " ++ show msgtype
+
+getNMessageLink :: Get NMessage
+getNMessageLink = do
+    skip 2
+    ty    <- fromIntegral <$> g16
+    idx   <- g32
+    flags <- g32
+    skip 4
+    return $ NLinkMsg ty idx flags
+
+getNMessageAddr :: Get NMessage
+getNMessageAddr = do
+    fam <- fromIntegral <$> g8
+    maskLen <- g8
+    flags <- g8
+    scope <- fromIntegral <$> g8
+    idx <- g32
+    return $ NAddrMsg fam maskLen flags scope idx
+
+putNMessage :: NMessage -> Put
+putNMessage (NLinkMsg ty idx flags) = do
+    p8 eAF_UNSPEC >> p8 0
+    p16 (fromIntegral ty)
+    p32 idx
+    p32 flags
+    p32 0xFFFFFFFF
+putNMessage (NAddrMsg fam maskLen flags scope idx) = do
+    p8 (fromIntegral fam)
+    p8 maskLen
+    p8 flags
+    p8 (fromIntegral scope)
+    p32 idx
+
+putGenericPacket :: (Convertable a, Eq a, Show a) => GenericPacket a -> [ByteString]
+putGenericPacket (GenericPacket header custom attributes) =
+  let attrs = runPut $putAttributes attributes
+      cus   = runPut $getPut custom
+      hdr   = runPut $putHeader (length attrs + length cus + 16) header
+  in [hdr, cus, attrs]
+putGenericPacket _ = error "Cannot convert this for transmission"
+
+
+
+getGenPacket :: (Convertable a, Eq a, Show a) => Get (GenericPacket a)
+getGenPacket = do
+    (len, header) <- getHeader
+    isolate len $ do
+        msg    <- getGet (messageType header)
+        attrs  <- getAttributes
+        return $ GenericPacket header msg attrs
+
+
+getGenericPackets :: (Convertable a, Eq a, Show a) => ByteString -> Either String [GenericPacket a]
+getGenericPackets bytes = flip runGet bytes $ do
+    pkts <- whileM (not <$> isEmpty) getGenPacket
+    isEmpty >>= \e -> when (not e) $ fail "Incomplete message parse"
+    return pkts
+
+getNPackets :: ByteString -> Either String [NPacket]
+getNPackets = getGenericPackets
 
 --
 -- Packet serialization
