@@ -26,6 +26,7 @@ Library
                      System.Linux.Netlink.Attributes
                      System.Linux.Netlink.GeNetlink
                      System.Linux.Netlink.GeNetlink.Constants
+                     System.Linux.Netlink.GeNetlink.Control
   Build-depends:     base >=4 && <5,
                      bytestring >=0.9,
                      cereal >=0.3 && <0.4,

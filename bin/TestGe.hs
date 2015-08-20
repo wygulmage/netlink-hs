@@ -10,6 +10,7 @@ import Data.Map (fromList, empty)
 import Data.Char (ord)
 
 import System.Linux.Netlink.GeNetlink
+import System.Linux.Netlink.GeNetlink.Control
 
 main = do
     sock <- makeSocket
