@@ -7,6 +7,11 @@ module System.Linux.Netlink.Protocol
     
     , getPacket
     , putPacket
+    , getGenericPacket
+    , getAttributes
+    , getHeader
+    , putHeader
+    , putAttributes
     ) where
 
 import Prelude hiding (length)
@@ -56,36 +61,76 @@ type Attributes = Map Int ByteString
 
 data Packet = Packet
     {
-      packetHeader     :: Header 
+      packetHeader     :: Header
     , packetMessage    :: Message
     , packetAttributes :: Attributes
     } deriving (Eq, Show)
+--
+-- Generic functions
+--
 
+getGenericPacket :: ByteString -> (Get a) -> Either String [a]
+getGenericPacket bytes f = flip runGet bytes $ do
+    pkts <- whileM (not <$> isEmpty) f
+    isEmpty >>= \e -> when (not e) $ fail "Incomplete message parse"
+    return pkts
+
+getAttributes :: Get Attributes
+getAttributes = fromList <$> whileM (not <$> isEmpty) getSingleAttribute
+
+
+getSingleAttribute :: Get (Int, ByteString)
+getSingleAttribute = do
+    len <- fromIntegral <$> g16
+    ty <- fromIntegral <$> g16
+    val <- getByteString (len - 4)
+    isEmpty >>= \e -> when (not e && len `mod` 4 /= 0) $ skip (4 - (len `mod` 4))
+    return (ty, val)
+
+getHeader :: Get (Int, Header)
+getHeader = do
+    isolate 16 $ do
+      len <- fromIntegral <$> g32
+      ty     <- fromIntegral <$> g16
+      flags  <- fromIntegral <$> g16
+      seqnum <- g32
+      pid    <- g32
+      return (len - 16, Header ty flags seqnum pid)
+
+putHeader :: Int -> Header -> Put
+putHeader len (Header ty flags seqnum pid) = do
+    p32 (fromIntegral len)
+    p16 (fromIntegral ty)
+    p16 (fromIntegral flags)
+    p32 seqnum
+    p32 pid
+
+
+--TODO maybe this should be changed
+putAttributes :: Attributes -> Put
+putAttributes = mapM_ putAttr . toList
+  where
+    putAttr (ty, value) = do
+        p16 (fromIntegral $len + 4)
+        p16 (fromIntegral ty)
+        putByteString value
+        when (len `mod` 4 /= 0) (sequence_ (replicate (4 - (len `mod` 4)) (p8 0)))
+        where
+          len = (length value)
 --
 -- Packet decoding
 --
 getPacket :: ByteString -> Either String [Packet]
-getPacket bytes = flip runGet bytes $ do
-    pkts <- whileM (not <$> isEmpty) getPacketInternal
-    isEmpty >>= \e -> when (not e) $ fail "Incomplete message parse"
-    return pkts
+getPacket = flip getGenericPacket getPacketInternal
+
 
 getPacketInternal :: Get Packet
 getPacketInternal = do
-    len <- fromIntegral <$> g32
-    isolate (len - 4) $ do
-        header <- getHeader
+    (len, header) <- getHeader
+    isolate len $ do
         msg    <- getMessage (messageType header)
-        attrs <- whileM (not <$> isEmpty) getSingleAttribute
-        return $ Packet header msg (fromList attrs)
-
-getHeader :: Get Header
-getHeader = do
-    ty     <- fromIntegral <$> g16
-    flags  <- fromIntegral <$> g16
-    seqnum <- g32
-    pid    <- g32
-    return $ Header ty flags seqnum pid
+        attrs <- getAttributes
+        return $ Packet header msg attrs
 
 getMessage :: MessageType -> Get Message
 getMessage msgtype | msgtype == eNLMSG_DONE  = skip 4 >> return DoneMsg
@@ -123,14 +168,6 @@ getMessageAddr = do
     idx <- g32
     return $ AddrMsg fam maskLen flags scope idx
 
-getSingleAttribute :: Get (Int, ByteString)
-getSingleAttribute = do
-    len <- fromIntegral <$> g16
-    ty <- fromIntegral <$> g16
-    val <- getByteString (len - 4)
-    isEmpty >>= \e -> when (not e && len `mod` 4 /= 0) $ skip (4 - (len `mod` 4))
-    return (ty, val)
-
 --
 -- Packet serialization
 --
@@ -141,13 +178,6 @@ putPacket (Packet header message attributes) =
         hdr = runPut $ putHeader (length msg + length attrs + 16) header
     in [hdr, msg, attrs]
 
-putHeader :: Int -> Header -> Put
-putHeader len (Header ty flags seqnum pid) = do
-    p32 (fromIntegral len)
-    p16 (fromIntegral ty)
-    p16 (fromIntegral flags)
-    p32 seqnum
-    p32 pid
 
 putMessage :: Message -> Put
 putMessage DoneMsg = p32 0
@@ -165,13 +195,6 @@ putMessage (AddrMsg fam maskLen flags scope idx) = do
     p32 idx
 putMessage _ = error "Can't transmit this message to the kernel."
 
-putAttributes :: Attributes -> Put
-putAttributes = mapM_ putAttr . toList
-  where
-    putAttr (ty, value) = do
-        p16 (fromIntegral ty)
-        p16 (fromIntegral . length $ value)
-        putByteString value
 
 --
 -- Helpers

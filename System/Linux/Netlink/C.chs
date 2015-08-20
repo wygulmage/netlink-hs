@@ -5,6 +5,7 @@ module System.Linux.Netlink.C
     (
       NetlinkSocket
     , makeSocket
+    , makeSocketGeneric
     , closeSocket
     , sendmsg
     , recvmsg
@@ -15,7 +16,7 @@ module System.Linux.Netlink.C
 
 import Control.Applicative ((<$>), (<*))
 import Control.Monad (when)
-import Data.Bits (Bits, (.|.), shiftL)
+import Data.Bits ((.|.), shiftL)
 import Data.ByteString (ByteString)
 import Data.ByteString.Internal (createAndTrim, toForeignPtr)
 import Data.Unique (hashUnique, newUnique)
@@ -48,11 +49,8 @@ newtype NetlinkSocket = NS CInt
 
 makeSocket :: IO NetlinkSocket
 makeSocket = do
-    fd <- throwErrnoIfMinus1 "makeSocket.socket" $
-          ({#call socket #}
-           eAF_NETLINK
-           (cFromEnum Raw)
-           (cFromEnum Route))
+    print "Test version"
+    (NS fd) <- makeSocketGeneric (cFromEnum Route)
     unique <- fromIntegral . hashUnique <$> newUnique
     pid <- fromIntegral <$> getProcessID
     let sockId = (unique `shiftL` 16) .|. pid
@@ -60,6 +58,15 @@ makeSocket = do
         throwErrnoIfMinus1_ "makeSocket.bind" $ do
             {#call bind #} fd (castPtr addr) {#sizeof sockaddr_nl #}
     return $ NS fd
+
+makeSocketGeneric :: Int -> IO NetlinkSocket
+makeSocketGeneric prot = do
+  fd <- throwErrnoIfMinus1 "makeSocket.socket" $
+          ({#call socket #}
+           eAF_NETLINK
+           (cFromEnum Raw)
+           (fromIntegral prot))
+  return $ NS fd
 
 closeSocket :: NetlinkSocket -> IO ()
 closeSocket (NS fd) = throwErrnoIfMinus1_ "closeSocket" $ {#call close #} fd
