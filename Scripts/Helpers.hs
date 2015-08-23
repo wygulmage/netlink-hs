@@ -32,9 +32,9 @@ mkFlag :: String -> Map String Integer -> ([String], [String])
 mkFlag name vals = (name : map fst values,
                     ty : "" : join (map makeConst values))
   where
-    ty = ("newtype " ++ name ++ " = " ++
+    ty = "newtype " ++ name ++ " = " ++
           name ++
-          " Int deriving (Bits, Eq, Enum, Integral, Num, Ord, Real, Show)")
+          " Int deriving (Bits, Eq, Enum, Integral, Num, Ord, Real, Show)"
     makeConst (n, v) = [n ++ " :: (Num a, Bits a) => a",
                         n ++ " = " ++ show v]
     values = sortBy (compare `on` snd) . toList . mapKeys ("f" ++) $ vals
@@ -43,18 +43,18 @@ mkEnum :: String -> Map String Integer -> ([String], [String])
 mkEnum name vals = (name : map fst values,
                     ty : "" : join (map makeConst values))
   where
-    ty = ("newtype " ++ name ++ " = " ++
+    ty = "newtype " ++ name ++ " = " ++
           name ++
-          " Int deriving (Eq, Enum, Integral, Num, Ord, Real, Show)")
+          " Int deriving (Eq, Enum, Integral, Num, Ord, Real, Show)"
     makeConst (n, v) = [n ++ " :: (Num a) => a",
                         n ++ " = " ++ show v]
     values = sortBy (compare `on` snd) . toList . mapKeys ('e' :) $ vals
 
 selectDefines :: String -> Map String Integer -> Map String Integer
-selectDefines regex defines = filterWithKey (\k v -> k =~ regex) defines
+selectDefines regex = filterWithKey (\k v -> k =~ regex)
 
 selectEnum :: String -> [Map String Integer] -> Map String Integer
-selectEnum regex enums = head $ filter (all (=~ regex) . keys) enums
+selectEnum regex = head $ filter (all (=~ regex) . keys)
 
 full :: String -> String
 full regex = "^" ++ regex ++ "$"
@@ -77,14 +77,14 @@ getEnums source = do
 
 evalCExpr :: CExpr -> Integer
 evalCExpr (CConst (CIntConst v _)) = getCInteger v
-evalCExpr (CBinary CAddOp a b _)   = (evalCExpr a) + (evalCExpr b)
-evalCExpr (CBinary CShlOp a b _)   = (evalCExpr a) * (2 ^ (evalCExpr b))
+evalCExpr (CBinary CAddOp a b _)   = evalCExpr a + evalCExpr b
+evalCExpr (CBinary CShlOp a b _)   = evalCExpr a * (2 ^ evalCExpr b)
 evalCExpr other                    = error $ "Other: " ++ show (pretty other)
 
 
 sanitize :: [[String]] -> [[String]]
-sanitize (("@define":n:[]):x:[y]:xs) = ["@define",n,y]:(sanitize xs)
-sanitize (("@define":x:y:[]):xs) = ["@define",x,y]:(sanitize xs)
+sanitize (["@define",n]:x:[y]:xs) = ["@define",n,y]:sanitize xs
+sanitize (["@define",x,y]:xs) = ["@define",x,y]:sanitize xs
 sanitize (_:xs) = sanitize xs
 sanitize [] = []
 
@@ -96,11 +96,11 @@ getDefinitions headers = do
         names = map (!! 1) $ filter (\d -> isDefine d && hasValue d) defines
         kludge = map (\n -> "@define \"" ++ n ++ "\" " ++ n) names
     defines2 <- map words . lines <$> preprocess (headers ++ unlines kludge)
-    let isInteresting d = (hasValue d &&
+    let isInteresting d = hasValue d &&
                            head d == "@define" &&
                            (all isNumber (d !! 2) ||
                             "0x" `isPrefixOf` (d !! 2) &&
-                            all isNumber (drop 2 (d !! 2))))
+                            all isNumber (drop 2 (d !! 2)))
         realDefines = map (take 2 . drop 1) $ filter isInteresting $ sanitize defines2
         clean [k,v] = (init (tail k), read v)
     return $ fromList (map clean realDefines)
