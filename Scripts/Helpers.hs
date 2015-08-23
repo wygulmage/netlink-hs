@@ -8,9 +8,9 @@ import Control.Monad (join)
 import Data.Char (isNumber, toLower, toUpper)
 import Data.Function (on)
 import Data.List (isPrefixOf, isInfixOf, notElem, sortBy)
-import Data.Map (Map, elems, filterWithKey, fromList,
-                 keys, mapKeys, toList)
-import Data.Maybe (mapMaybe)
+import Data.Map (Map, elems, filterWithKey, fromList, insert,
+                 keys, mapKeys, toList, lookup, empty)
+import Data.Maybe (mapMaybe, catMaybes, fromJust)
 import Language.C.Analysis (runTrav_)
 import Language.C.Analysis.AstAnalysis (analyseAST)
 import Language.C.Analysis.SemRep (GlobalDecls(..), TagDef(EnumDef),
@@ -24,6 +24,8 @@ import Language.C.Syntax.Constants (getCInteger)
 import Language.C.Syntax.AST (CExpression(..), CExpr(..), CConstant(CIntConst), CBinaryOp(..))
 import System.Process (readProcess)
 import Text.Regex.PCRE ((=~))
+
+import Prelude hiding (lookup)
 
 mkIncludeBlock :: [String] -> String
 mkIncludeBlock = unlines . map (\e -> "#include <" ++ e ++ ">")
@@ -54,7 +56,7 @@ selectDefines :: String -> Map String Integer -> Map String Integer
 selectDefines regex = filterWithKey (\k v -> k =~ regex)
 
 selectEnum :: String -> [Map String Integer] -> Map String Integer
-selectEnum regex = head $ filter (all (=~ regex) . keys)
+selectEnum regex = head . filter (all (=~ regex) . keys)
 
 full :: String -> String
 full regex = "^" ++ regex ++ "$"
@@ -70,16 +72,28 @@ getEnums source = do
     check (Right a)   = a
     preprocessed = readProcess "gcc" ["-E", "-"] source
     initPos = position 0 "" 0 0
-    getEnum (EnumDef (EnumType _ es _ _)) = Just $ map getEnumValue es
-    getEnum _                             = Nothing
-    getEnumValue (Enumerator (Ident s _ _) v _ _) = (s, evalCExpr v)
-    cleanEnums = filterWithKey (\k v -> not ("_" `isPrefixOf` k)) . fromList
+    cleanEnums = filterWithKey (\k _ -> not ("_" `isPrefixOf` k))
+
+
+getEnum :: TagDef -> Maybe (Map String Integer)
+getEnum (EnumDef (EnumType _ es _ _)) = Just $foldl getEnumValue empty es
+getEnum _ = Nothing
+
+getEnumValue :: Map String Integer -> Enumerator -> Map String Integer
+getEnumValue m (Enumerator (Ident s _ _) v _ _) = insert s a m
+  where a = evalEExpr m v
+
+evalEExpr :: Map String Integer -> CExpr -> Integer
+evalEExpr _ (CConst (CIntConst v _)) = getCInteger v
+evalEExpr m (CBinary CAddOp a b _)   = evalEExpr m a + evalEExpr m b
+evalEExpr m (CBinary CSubOp a b _)   = evalEExpr m a - evalEExpr m b
+evalEExpr m (CBinary CShlOp a b _)   = evalEExpr m a * (2 ^ evalEExpr m b)
+evalEExpr m (CVar (Ident a _ _) _)   = fromJust $lookup a m
+evalEExpr _ other                    = error $ "Other: " ++ show (pretty other)
+
 
 evalCExpr :: CExpr -> Integer
-evalCExpr (CConst (CIntConst v _)) = getCInteger v
-evalCExpr (CBinary CAddOp a b _)   = evalCExpr a + evalCExpr b
-evalCExpr (CBinary CShlOp a b _)   = evalCExpr a * (2 ^ evalCExpr b)
-evalCExpr other                    = error $ "Other: " ++ show (pretty other)
+evalCExpr = evalEExpr empty
 
 
 sanitize :: [[String]] -> [[String]]
