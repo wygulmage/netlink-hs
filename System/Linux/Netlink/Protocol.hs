@@ -24,7 +24,7 @@ module System.Linux.Netlink.Protocol
 import Prelude hiding (length)
 
 import Control.Applicative ((<$>))
-import Control.Monad (when)
+import Control.Monad (when, replicateM_, unless)
 import Control.Monad.Loops (whileM)
 import Data.ByteString (ByteString, length)
 import Data.Map (Map, fromList, toList)
@@ -119,10 +119,10 @@ data Packet = Packet
 -- Generic functions
 --
 
-getGenericPacket :: ByteString -> (Get a) -> Either String [a]
+getGenericPacket :: ByteString -> Get a -> Either String [a]
 getGenericPacket bytes f = flip runGet bytes $ do
     pkts <- whileM (not <$> isEmpty) f
-    isEmpty >>= \e -> when (not e) $ fail "Incomplete message parse"
+    isEmpty >>= \e -> unless e $ fail "Incomplete message parse"
     return pkts
 
 getAttributes :: Get Attributes
@@ -138,8 +138,7 @@ getSingleAttribute = do
     return (ty, val)
 
 getHeader :: Get (Int, Header)
-getHeader = do
-    isolate 16 $ do
+getHeader = isolate 16 $ do
       len <- fromIntegral <$> g32
       ty     <- fromIntegral <$> g16
       flags  <- fromIntegral <$> g16
@@ -164,9 +163,9 @@ putAttributes = mapM_ putAttr . toList
         p16 (fromIntegral $len + 4)
         p16 (fromIntegral ty)
         putByteString value
-        when (len `mod` 4 /= 0) (sequence_ (replicate (4 - (len `mod` 4)) (p8 0)))
+        when (len `mod` 4 /= 0) (replicateM_ (4 - (len `mod` 4)) (p8 0))
         where
-          len = (length value)
+          len = length value
 --
 -- Packet decoding
 --
@@ -280,7 +279,7 @@ getError hdr = do
 
 getGenPacketContent :: (Convertable a, Eq a, Show a) => Header -> Get (GenericPacket a)
 getGenPacketContent hdr
-  | messageType hdr == eNLMSG_DONE  = skip 4 >> (return $GenericDoneMsg hdr)
+  | messageType hdr == eNLMSG_DONE  = skip 4 >> return (GenericDoneMsg hdr)
   | messageType hdr == eNLMSG_ERROR = getError hdr
   | otherwise  = do
       msg    <- getGet (messageType hdr)
@@ -295,7 +294,7 @@ getGenPacket = do
 getGenericPackets :: (Convertable a, Eq a, Show a) => ByteString -> Either String [GenericPacket a]
 getGenericPackets bytes = flip runGet bytes $ do
     pkts <- whileM (not <$> isEmpty) getGenPacket
-    isEmpty >>= \e -> when (not e) $ fail "Incomplete message parse"
+    isEmpty >>= \e -> unless e $ fail "Incomplete message parse"
     return pkts
 
 getNPackets :: ByteString -> Either String [NPacket]

@@ -6,27 +6,24 @@ module System.Linux.Netlink.Internal
     , queryN
     , queryOneN
       
-    , module System.Linux.Netlink.Attributes
-    , module System.Linux.Netlink.C
-    , module System.Linux.Netlink.Constants
-    , module System.Linux.Netlink.Protocol
+    , module X
     ) where
 
 import Control.Applicative ((<$>))
 import Control.Monad (when)
 import Data.Bits (Bits, (.&.))
 
-import System.Linux.Netlink.Attributes
-import System.Linux.Netlink.C
-import System.Linux.Netlink.Constants
-import System.Linux.Netlink.Protocol
+import System.Linux.Netlink.Attributes as X
+import System.Linux.Netlink.C as X
+import System.Linux.Netlink.Constants as X
+import System.Linux.Netlink.Protocol as X
 
-queryN :: (Convertable a, Eq a, Show a) => NetlinkSocket -> (GenericPacket a) -> IO [GenericPacket a]
+queryN :: (Convertable a, Eq a, Show a) => NetlinkSocket -> GenericPacket a -> IO [GenericPacket a]
 queryN sock req = do
     sendmsg sock (putGenericPacket req)
     recvMultiN sock
 
-queryOneN :: (Convertable a, Eq a, Show a) => NetlinkSocket -> (GenericPacket a) -> IO (GenericPacket a)
+queryOneN :: (Convertable a, Eq a, Show a) => NetlinkSocket -> GenericPacket a -> IO (GenericPacket a)
 queryOneN sock req = do
     sendmsg sock (putGenericPacket req)
     pkts <- recvMultiN sock
@@ -47,7 +44,7 @@ recvMultiN sock = do
     isDone  = (== eNLMSG_DONE) . messageType . genericPacketHeader
 
 recvOneN :: (Convertable a, Eq a, Show a) => NetlinkSocket -> IO [GenericPacket a]
-recvOneN sock = recvmsg sock bufferSize >>= \b -> case (getGenericPackets b) of
+recvOneN sock = recvmsg sock bufferSize >>= \b -> case getGenericPackets b of
     Left err   -> fail err
     Right pkts -> return pkts
 
@@ -83,7 +80,7 @@ recvMulti sock = do
     isDone  = (== eNLMSG_DONE) . messageType . packetHeader
 
 recvOne :: NetlinkSocket -> IO [Packet]
-recvOne sock = recvmsg sock bufferSize >>= \b -> case (getPacket b) of
+recvOne sock = recvmsg sock bufferSize >>= \b -> case getPacket b of
     Left err   -> fail err
     Right pkts -> return pkts
 
