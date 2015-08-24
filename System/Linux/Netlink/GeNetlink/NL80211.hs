@@ -2,14 +2,16 @@ module System.Linux.Netlink.GeNetlink.NL80211
 where
 
 --import Control.Applicative ((<$>))
-import Data.Word (Word32, Word16, Word8)
 import Control.Monad (liftM, liftM2)
 import Data.Bits ((.|.))
-import Data.Maybe (mapMaybe)
-import Data.Serialize.Get
-import Data.ByteString hiding (unpack)
 import Data.ByteString.Char8 (unpack)
-import qualified Data.Map as M (empty, lookup)
+import Data.Maybe (mapMaybe)
+import Data.Serialize.Get (runGet, getWord32host)
+import Data.Serialize.Put (runPut, putWord32host)
+import Data.Word (Word32, Word16, Word8)
+
+import qualified Data.ByteString as BS
+import qualified Data.Map as M (empty, lookup, fromList, member)
 
 
 import System.Linux.Netlink.C hiding (makeSocket)
@@ -18,7 +20,7 @@ import System.Linux.Netlink.Protocol
 import System.Linux.Netlink.GeNetlink
 import System.Linux.Netlink.GeNetlink.Control
 import System.Linux.Netlink.GeNetlink.NL80211.Constants
-import System.Linux.Netlink.Internal hiding (queryOneN, queryN, query, queryOne)
+--import System.Linux.Netlink.Internal hiding (queryOneN, queryN, query, queryOne)
 import qualified System.Linux.Netlink.Internal as I (queryOneN, queryN)
 
 -- The Netlink socket with Family Id, so we don't need as many arguments
@@ -26,6 +28,8 @@ import qualified System.Linux.Netlink.Internal as I (queryOneN, queryN)
 data NL80211Socket = NLS NetlinkSocket Word16
 
 type NL80211Packet = GenlPacket NoData
+
+type ByteString = BS.ByteString --the name would just annoy me
 
 makeNL80211Socket :: IO NL80211Socket
 makeNL80211Socket = do
@@ -60,7 +64,7 @@ query (NLS sock fid) cmd dump attrs = I.queryN sock packet
 
 parseInterface :: (ByteString, ByteString) -> (String, Word32)
 parseInterface (name, ifindex) =
-  (unpack name, getRight $runGet getWord32host ifindex)
+  (init $unpack name, getRight $runGet getWord32host ifindex)
   where getRight (Right x) = x
         getRight (Left err) = error err
 
@@ -74,3 +78,13 @@ getInterfaceList sock = do
         toTuple (GenericDoneMsg _) = Nothing
         name = M.lookup eNL80211_ATTR_IFNAME
         findex = M.lookup eNL80211_ATTR_IFINDEX
+
+getScanResults :: NL80211Socket -> Word32 -> IO [NL80211Packet]
+getScanResults sock ifindex = query sock eNL80211_CMD_GET_SCAN True attrs
+  where attrs = M.fromList [(eNL80211_ATTR_IFINDEX, runPut $putWord32host ifindex)]
+
+getConnectedWifi :: NL80211Socket -> Word32 -> IO [NL80211Packet]
+getConnectedWifi sock ifindex = liftM (filter isConn) $ getScanResults sock ifindex
+  where isConn (GenericPacket _ _ attrs) = M.member eNL80211_BSS_STATUS attrs
+        isConn (GenericError{}) = error "Something stupid happened"
+        isConn (GenericDoneMsg _) = False
