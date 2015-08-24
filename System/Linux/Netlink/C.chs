@@ -9,6 +9,7 @@ module System.Linux.Netlink.C
     , closeSocket
     , sendmsg
     , recvmsg
+    , joinMulticastGroup
 
     , cFromEnum
     , cToEnum
@@ -25,6 +26,7 @@ import Foreign.C.Error (throwErrnoIf, throwErrnoIfMinus1, throwErrnoIfMinus1_)
 import Foreign.C.Types
 import Foreign.ForeignPtr (touchForeignPtr)
 import Foreign.ForeignPtr.Unsafe (unsafeForeignPtrToPtr)
+import Foreign.Marshal.Alloc
 import Foreign.Marshal.Array (withArrayLen)
 import Foreign.Marshal.Utils (with)
 import Foreign.Ptr (Ptr, castPtr, plusPtr)
@@ -155,3 +157,12 @@ cFromEnum = fromIntegral . fromEnum
 
 cToEnum :: (Integral i, Enum e) => i -> e
 cToEnum = toEnum . fromIntegral
+
+joinMulticastGroup :: NetlinkSocket -> Word32 -> IO ()
+joinMulticastGroup (NS fd) fid = do
+  _ <- throwErrnoIfMinus1 "joinMulticast" $alloca ( \ptr -> do
+    poke ptr fid
+    {#call setsockopt as _setsockopt #} fd sol_netlink 1 (castPtr ptr) size)
+  return ()
+  where size = (fromIntegral $sizeOf (undefined :: CInt))
+        sol_netlink = 270 :: CInt
