@@ -20,14 +20,15 @@ Source-repository head
 Library
   Exposed-modules:   System.Linux.Netlink
                      System.Linux.Netlink.Internal
-  Other-modules:     System.Linux.Netlink.C
+  Other-modules:     System.Linux.Netlink.Attributes
+                     System.Linux.Netlink.C
                      System.Linux.Netlink.Constants
-                     System.Linux.Netlink.Protocol
-                     System.Linux.Netlink.Attributes
                      System.Linux.Netlink.GeNetlink
                      System.Linux.Netlink.GeNetlink.Constants
                      System.Linux.Netlink.GeNetlink.Control
+                     System.Linux.Netlink.GeNetlink.NL80211
                      System.Linux.Netlink.GeNetlink.NL80211.Constants
+                     System.Linux.Netlink.Protocol
   Build-depends:     base >=4 && <5,
                      bytestring >=0.9,
                      cereal >=0.3 && <0.4,

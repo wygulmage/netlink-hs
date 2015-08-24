@@ -6,7 +6,7 @@ module System.Linux.Netlink.Internal
     , queryN
     , queryOneN
       
-    , module X
+--    , module X
     ) where
 
 import Control.Applicative ((<$>))
