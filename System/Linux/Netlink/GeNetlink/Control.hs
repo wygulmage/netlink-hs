@@ -1,7 +1,7 @@
 module System.Linux.Netlink.GeNetlink.Control
 (getFamilyId, CtrlAttribute(..), CtrlAttrMcastGroup(..), CtrlPacket(..),
 CTRLPacket, ctrlPacketFromGenl, CtrlAttrOpData(..), ctrlPackettoGenl,
-getFamilyWithMulticasts)
+getFamilyWithMulticasts, getMulticastGroups, getMulticast)
 where
 
 import Control.Applicative ((<$>))
@@ -19,6 +19,9 @@ import Prelude hiding (lookup)
 import System.Linux.Netlink.GeNetlink
 import System.Linux.Netlink.Internal
 import System.Linux.Netlink.GeNetlink.Constants
+import System.Linux.Netlink.Protocol
+import System.Linux.Netlink.Constants
+import System.Linux.Netlink.C
 
 
 data CtrlAttrMcastGroup = CAMG {grpName :: String, grpId :: Word32 } deriving (Eq, Show)
@@ -137,7 +140,14 @@ ctrlPackettoGenl :: CtrlPacket -> CTRLPacket
 ctrlPackettoGenl (CtrlPacket h g attrs)= GenericPacket h (GenlData g NoData) a
   where a = fromList $map ctrlAttributesToAttribute attrs
 
+--TODO maybe set request id more sensible?
 
+familyMcastRequest :: Word16 -> CTRLPacket
+familyMcastRequest fid = let
+  header = Header 16 fNLM_F_REQUEST 42 0
+  geheader = GenlHeader eCTRL_CMD_GETFAMILY 0
+  attrs = fromList [(eCTRL_ATTR_FAMILY_ID, runPut $putWord16host fid)] in
+    GenericPacket header (GenlData geheader NoData) attrs
 
 familyIdRequest :: String -> CTRLPacket
 familyIdRequest name = let
@@ -146,18 +156,29 @@ familyIdRequest name = let
   attrs = fromList [(eCTRL_ATTR_FAMILY_NAME, pack name `append` pack "\0")] in
     GenericPacket header (GenlData geheader NoData) attrs
 
-getFamilyId :: NetlinkSocket -> String -> IO Int
+getFamilyId :: NetlinkSocket -> String -> IO Word16
 getFamilyId s m = fmap fst (getFamilyWithMulticasts s m)
 
-
-getFamilyWithMulticasts :: NetlinkSocket -> String -> IO (Int, [CtrlAttrMcastGroup])
+getFamilyWithMulticasts :: NetlinkSocket -> String -> IO (Word16, [CtrlAttrMcastGroup])
 getFamilyWithMulticasts sock name = do
   (CtrlPacket _ _ attrs) <- ctrlPacketFromGenl <$> queryOneN sock (familyIdRequest name)
-  return (fromIntegral $getIdFromList attrs, getMCFromList attrs)
+  return (getIdFromList attrs, getMCFromList attrs)
   where getIdFromList (CTRL_ATTR_FAMILY_ID x:_) = x
         getIdFromList (_:xs) = getIdFromList xs
         getIdFromList [] = -1
-        
-        getMCFromList (CTRL_ATTR_MCAST_GROUPS x:_) = x
-        getMCFromList (_:xs) = getMCFromList xs
-        getMCFromList [] = []
+
+getMulticastGroups :: NetlinkSocket -> Word16 -> IO [CtrlAttrMcastGroup]
+getMulticastGroups sock fid = do
+  (CtrlPacket _ _ attrs) <- ctrlPacketFromGenl <$> queryOneN sock (familyMcastRequest fid)
+  return $getMCFromList attrs
+
+getMCFromList :: [CtrlAttribute] -> [CtrlAttrMcastGroup]
+getMCFromList (CTRL_ATTR_MCAST_GROUPS x:_) = x
+getMCFromList (_:xs) = getMCFromList xs
+getMCFromList [] = []
+
+getMulticast :: String -> [CtrlAttrMcastGroup] -> Maybe Word32
+getMulticast _ [] = Nothing
+getMulticast name (CAMG gname gid:xs) = if name == gname
+   then Just gid
+   else getMulticast name xs
