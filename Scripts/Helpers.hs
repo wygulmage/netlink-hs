@@ -1,6 +1,6 @@
 module Scripts.Helpers
 (mkIncludeBlock, getDefinitions, getEnums, selectDefines, selectEnum, mkEnum,
-mkFlag)
+mkFlag, selectEnums)
 where
 
 import Control.Applicative ((<$>))
@@ -56,7 +56,10 @@ selectDefines :: String -> Map String Integer -> Map String Integer
 selectDefines regex = filterWithKey (\k v -> k =~ regex)
 
 selectEnum :: String -> [Map String Integer] -> Map String Integer
-selectEnum regex = head . filter (all (=~ regex) . keys)
+selectEnum regex = head . selectEnums regex
+
+selectEnums :: String -> [Map String Integer] -> [Map String Integer]
+selectEnums regex = filter (all (=~ regex) . keys)
 
 full :: String -> String
 full regex = "^" ++ regex ++ "$"
