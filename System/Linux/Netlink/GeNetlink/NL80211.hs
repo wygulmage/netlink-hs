@@ -87,11 +87,11 @@ getScanResults sock ifindex = query sock eNL80211_CMD_GET_SCAN True attrs
   where attrs = M.fromList [(eNL80211_ATTR_IFINDEX, runPut $putWord32host ifindex)]
 
 
---Of course those are the wrong attrs...
 getConnectedWifi :: NL80211Socket -> Word32 -> IO [NL80211Packet]
 getConnectedWifi sock ifindex = liftM (filter isConn) $ getScanResults sock ifindex
-  where isConn (GenericPacket _ _ attrs) = hasConn $M.lookup eNL80211_BSS_STATUS attrs
+  where isConn (GenericPacket _ _ attrs) = hasConn $M.lookup eNL80211_ATTR_BSS attrs
         isConn (GenericError{}) = error "Something stupid happened"
         isConn (GenericDoneMsg _) = False
         hasConn Nothing = False
         hasConn (Just attrs) = M.member eNL80211_BSS_STATUS $getRight $runGet getAttributes attrs
+
