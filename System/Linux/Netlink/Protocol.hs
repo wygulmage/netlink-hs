@@ -160,12 +160,10 @@ putAttributes :: Attributes -> Put
 putAttributes = mapM_ putAttr . toList
   where
     putAttr (ty, value) = do
-        p16 (fromIntegral $len + 4)
+        p16 (fromIntegral $length value + 4)
         p16 (fromIntegral ty)
         putByteString value
-        when (len `mod` 4 /= 0) (replicateM_ (4 - (len `mod` 4)) (p8 0))
-        where
-          len = length value
+        when (length value `mod` 4 /= 0) $replicateM_ (4 - (length value `mod` 4)) (p8 0)
 --
 -- Packet decoding
 --

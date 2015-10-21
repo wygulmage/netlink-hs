@@ -15,7 +15,7 @@ module System.Linux.Netlink.C
     , cToEnum
     ) where
 
-import Control.Applicative ((<$>), (<*))
+--import Control.Applicative ((<$>), (<*))
 import Control.Monad (when)
 import Data.Bits ((.|.), shiftL)
 import Data.ByteString (ByteString)
@@ -68,6 +68,9 @@ makeSocketGeneric prot = do
            eAF_NETLINK
            (cFromEnum Raw)
            (fromIntegral prot))
+  with (SockAddrNetlink 0) $ \addr ->
+    throwErrnoIfMinus1_ "makeSocket.bind" $ do
+      {# call bind #} fd (castPtr addr) {#sizeof sockaddr_nl #}
   return $ NS fd
 
 closeSocket :: NetlinkSocket -> IO ()
@@ -109,7 +112,7 @@ instance Storable IoVec where
 data MsgHdr = MsgHdr (Ptr (), Int)
 
 instance Storable MsgHdr where
-    sizeOf    _ = {#sizeof iovec #}
+    sizeOf    _ = {#sizeof msghdr #}
     alignment _ = 4
     peek p = do
         iov     <- {#get msghdr.msg_iov     #} p

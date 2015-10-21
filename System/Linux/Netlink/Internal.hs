@@ -5,6 +5,8 @@ module System.Linux.Netlink.Internal
 
     , queryN
     , queryOneN
+
+    , recvOneN
       
 --    , module X
     ) where
