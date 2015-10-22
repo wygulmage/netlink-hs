@@ -11,6 +11,7 @@ import Data.Char (ord)
 
 
 import System.Linux.Netlink
+import System.Linux.Netlink.Route
 import System.Linux.Netlink.Constants
 
 main = do
@@ -19,8 +20,8 @@ main = do
         header  = Header eRTM_GETLINK flags 42 0
         message = NLinkMsg 0 2 0
         attrs   = empty
-    iface <- queryOne sock (GenericPacket header message attrs)
-    let attrs = genericPacketAttributes iface
+    iface <- queryOne sock (Packet header message attrs)
+    let attrs = packetAttributes iface
     print $ getLinkAddress attrs
     print $ getLinkBroadcast attrs
     print $ getLinkName attrs

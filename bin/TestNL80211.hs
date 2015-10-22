@@ -2,12 +2,10 @@ module Main
 where
 
 import Data.Maybe (mapMaybe)
-import Hexdump
+import Text.Hexdump
 
-import Control.Concurrent (threadDelay)
 import System.Linux.Netlink.GeNetlink.NL80211
-import System.Linux.Netlink.Protocol (Attributes)
-import System.Linux.Netlink.C (recvmsg)
+
 
 
 import qualified Data.Map as M
@@ -36,7 +34,6 @@ main = do
   let eids = mapMaybe getWifiAttributes current
   putStrLn ("current: " ++ (show eids))
 
-  threadDelay 1000000
   joinMulticastByName sock "mlme"
 
   packet <- getPaket sock
