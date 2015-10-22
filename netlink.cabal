@@ -1,5 +1,5 @@
 Name:                netlink
-Version:             0.1
+Version:             1.0.0.0
 Synopsis:            Netlink communication for Haskell
 Description:         Library to comminicate with Linux kernel via Netlink
 Homepage:            http://netlink-hs.googlecode.com/
