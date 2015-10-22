@@ -3,8 +3,7 @@
 
 module System.Linux.Netlink.C
     (
-      NetlinkSocket
-    , makeSocket
+      makeSocket
     , makeSocketGeneric
     , closeSocket
     , sendmsg
@@ -17,10 +16,10 @@ module System.Linux.Netlink.C
 
 --import Control.Applicative ((<$>), (<*))
 import Control.Monad (when)
-import Data.Bits ((.|.), shiftL)
+--import Data.Bits ((.|.), shiftL)
 import Data.ByteString (ByteString)
 import Data.ByteString.Internal (createAndTrim, toForeignPtr)
-import Data.Unique (hashUnique, newUnique)
+--import Data.Unique (hashUnique, newUnique)
 import Data.Word (Word32)
 import Foreign.C.Error (throwErrnoIf, throwErrnoIfMinus1, throwErrnoIfMinus1_)
 import Foreign.C.Types
@@ -31,7 +30,7 @@ import Foreign.Marshal.Array (withArrayLen)
 import Foreign.Marshal.Utils (with)
 import Foreign.Ptr (Ptr, castPtr, plusPtr)
 import Foreign.Storable (Storable(..))
-import System.Posix.Process (getProcessID)
+--import System.Posix.Process (getProcessID)
 
 import System.Linux.Netlink.Constants (eAF_NETLINK)
 
@@ -47,21 +46,11 @@ typedef struct iovec iovec;
 typedef struct sockaddr_nl sockaddr_nl;
 #endc
 
-newtype NetlinkSocket = NS CInt
+makeSocket :: IO CInt
+makeSocket = makeSocketGeneric (cFromEnum Route)
 
-makeSocket :: IO NetlinkSocket
-makeSocket = do
-    print "Test version"
-    (NS fd) <- makeSocketGeneric (cFromEnum Route)
-    unique <- fromIntegral . hashUnique <$> newUnique
-    pid <- fromIntegral <$> getProcessID
-    let sockId = (unique `shiftL` 16) .|. pid
-    with (SockAddrNetlink sockId) $ \addr ->
-        throwErrnoIfMinus1_ "makeSocket.bind" $ do
-            {#call bind #} fd (castPtr addr) {#sizeof sockaddr_nl #}
-    return $ NS fd
-
-makeSocketGeneric :: Int -> IO NetlinkSocket
+-- TODO maybe readd the unique thingy (look at git log)
+makeSocketGeneric :: Int -> IO CInt
 makeSocketGeneric prot = do
   fd <- throwErrnoIfMinus1 "makeSocket.socket" $
           ({#call socket #}
@@ -71,21 +60,21 @@ makeSocketGeneric prot = do
   with (SockAddrNetlink 0) $ \addr ->
     throwErrnoIfMinus1_ "makeSocket.bind" $ do
       {# call bind #} fd (castPtr addr) {#sizeof sockaddr_nl #}
-  return $ NS fd
+  return fd
 
-closeSocket :: NetlinkSocket -> IO ()
-closeSocket (NS fd) = throwErrnoIfMinus1_ "closeSocket" $ {#call close #} fd
+closeSocket :: CInt -> IO ()
+closeSocket fd = throwErrnoIfMinus1_ "closeSocket" $ {#call close #} fd
 
-sendmsg :: NetlinkSocket -> [ByteString] -> IO ()
-sendmsg (NS fd) bs =
+sendmsg :: CInt -> [ByteString] -> IO ()
+sendmsg fd bs =
     useManyAsPtrLen bs $ \ptrs ->
     withArrayLen (map IoVec ptrs) $ \iovlen iov ->
     with (MsgHdr (castPtr iov, iovlen)) $ \msg ->
     throwErrnoIfMinus1_ "sendmsg" $ do
         {#call sendmsg as _sendmsg #} fd (castPtr msg) (0 :: CInt)
 
-recvmsg :: NetlinkSocket -> Int -> IO ByteString
-recvmsg (NS fd) len =
+recvmsg :: CInt -> Int -> IO ByteString
+recvmsg fd len =
     createAndTrim len $ \ptr ->
     with (IoVec (castPtr ptr, len)) $ \vec ->
     with (MsgHdr (castPtr vec, 1)) $ \msg ->
@@ -161,8 +150,8 @@ cFromEnum = fromIntegral . fromEnum
 cToEnum :: (Integral i, Enum e) => i -> e
 cToEnum = toEnum . fromIntegral
 
-joinMulticastGroup :: NetlinkSocket -> Word32 -> IO ()
-joinMulticastGroup (NS fd) fid = do
+joinMulticastGroup :: CInt -> Word32 -> IO ()
+joinMulticastGroup fd fid = do
   _ <- throwErrnoIfMinus1 "joinMulticast" $alloca ( \ptr -> do
     poke ptr fid
     {#call setsockopt as _setsockopt #} fd sol_netlink 1 (castPtr ptr) size)

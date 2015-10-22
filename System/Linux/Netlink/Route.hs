@@ -1,7 +1,12 @@
 {-# LANGUAGE OverloadedStrings #-}
+module System.Linux.Netlink.Route
+    (
+      Packet
 
-module System.Linux.Netlink.Attributes 
-    ( getLinkAddress
+    , getRoutePackets
+    , Message(..)
+    
+    , getLinkAddress
     , getLinkBroadcast
     , getLinkName
     , getLinkMTU
@@ -16,18 +21,97 @@ module System.Linux.Netlink.Attributes
     , putLinkTXQLen
     ) where
 
-import Prelude hiding (init, lookup)
+import Prelude hiding (length, lookup, init)
 
 import Control.Applicative ((<$>))
 import Data.ByteString.Char8 (ByteString, append, init, pack, unpack)
 import Data.Char (chr, ord)
 import Data.Map (insert, lookup)
-import Data.Serialize.Get (runGet, getWord32host)
-import Data.Serialize.Put (runPut, putWord32host)
+import Data.Serialize.Get
+import Data.Serialize.Put
 import Data.Word (Word8, Word32)
 
 import System.Linux.Netlink.Constants
-import System.Linux.Netlink.Protocol
+import System.Linux.Netlink
+import System.Linux.Netlink.Helpers
+
+data Message = NLinkMsg
+    {
+      interfaceType  :: LinkType
+    , interfaceIndex :: Word32
+    , interfaceFlags :: Word32
+    }
+             | NAddrMsg
+    {
+      addrFamily         :: AddressFamily
+    , addrMaskLength     :: Word8
+    , addrFlags          :: Word8
+    , addrScope          :: Word8
+    , addrInterfaceIndex :: Word32
+    } deriving (Eq, Show)
+
+instance Convertable Message where
+  getGet = getMessage
+  getPut = putMessage
+
+type RoutePacket = Packet Message
+
+--
+-- Generic functions
+--
+
+
+
+--TODO maybe this should be changed
+--
+-- New generic stuffs
+--
+
+getMessage :: MessageType -> Get Message
+getMessage msgtype | msgtype == eRTM_NEWLINK = getMessageLink
+                   | msgtype == eRTM_GETLINK = getMessageLink
+                   | msgtype == eRTM_DELLINK = getMessageLink
+                   | msgtype == eRTM_NEWADDR = getMessageAddr
+                   | msgtype == eRTM_GETADDR = getMessageAddr
+                   | msgtype == eRTM_DELADDR = getMessageAddr
+                   | otherwise               =
+                       error $ "Can't decode message " ++ show msgtype
+
+getMessageLink :: Get Message
+getMessageLink = do
+    skip 2
+    ty    <- fromIntegral <$> g16
+    idx   <- g32
+    flags <- g32
+    skip 4
+    return $ NLinkMsg ty idx flags
+
+getMessageAddr :: Get Message
+getMessageAddr = do
+    fam <- fromIntegral <$> g8
+    maskLen <- g8
+    flags <- g8
+    scope <- fromIntegral <$> g8
+    idx <- g32
+    return $ NAddrMsg fam maskLen flags scope idx
+
+putMessage :: Message -> Put
+putMessage (NLinkMsg ty idx flags) = do
+    p8 eAF_UNSPEC >> p8 0
+    p16 (fromIntegral ty)
+    p32 idx
+    p32 flags
+    p32 0xFFFFFFFF
+putMessage (NAddrMsg fam maskLen flags scope idx) = do
+    p8 (fromIntegral fam)
+    p8 maskLen
+    p8 flags
+    p8 (fromIntegral scope)
+    p32 idx
+
+getRoutePackets :: ByteString -> Either String [RoutePacket]
+getRoutePackets = getPackets
+
 
 type AttributeReader a = Attributes -> Maybe a
 

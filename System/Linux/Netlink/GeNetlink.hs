@@ -7,8 +7,7 @@ import Data.Word (Word8)
 
 
 
-import System.Linux.Netlink.Protocol
-import System.Linux.Netlink.C hiding (makeSocket)
+import System.Linux.Netlink hiding (makeSocket)
 
 data GenlHeader = GenlHeader
     {
@@ -39,7 +38,7 @@ instance Convertable a => Convertable (GenlData a) where
     dat <- getGet t
     return $GenlData hdr dat
 
-type GenlPacket a = GenericPacket (GenlData a)
+type GenlPacket a = Packet (GenlData a)
 
 
 
