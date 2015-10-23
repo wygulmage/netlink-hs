@@ -1,6 +1,6 @@
 {-# LANGUAGE ForeignFunctionInterface #-}
+{-# LANGUAGE CPP #-}
 {-# OPTIONS_GHC -fno-warn-overlapping-patterns #-}
-
 module System.Linux.Netlink.C
     (
       makeSocket
@@ -14,12 +14,12 @@ module System.Linux.Netlink.C
     , cToEnum
     ) where
 
---import Control.Applicative ((<$>), (<*))
+--Don't know how to fis this warning on 7.10 for now :(
+import Control.Applicative ((<$>), (<*))
+
 import Control.Monad (when)
---import Data.Bits ((.|.), shiftL)
 import Data.ByteString (ByteString)
 import Data.ByteString.Internal (createAndTrim, toForeignPtr)
---import Data.Unique (hashUnique, newUnique)
 import Data.Word (Word32)
 import Foreign.C.Error (throwErrnoIf, throwErrnoIfMinus1, throwErrnoIfMinus1_)
 import Foreign.C.Types
@@ -30,7 +30,6 @@ import Foreign.Marshal.Array (withArrayLen)
 import Foreign.Marshal.Utils (with)
 import Foreign.Ptr (Ptr, castPtr, plusPtr)
 import Foreign.Storable (Storable(..))
---import System.Posix.Process (getProcessID)
 
 import System.Linux.Netlink.Constants (eAF_NETLINK)
 

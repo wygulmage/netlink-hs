@@ -1,10 +1,15 @@
+{-# LANGUAGE CPP #-}
 module System.Linux.Netlink.GeNetlink.Control
 (getFamilyId, CtrlAttribute(..), CtrlAttrMcastGroup(..), CtrlPacket(..),
 CTRLPacket, ctrlPacketFromGenl, CtrlAttrOpData(..), ctrlPackettoGenl,
 getFamilyWithMulticasts, getMulticastGroups, getMulticast)
 where
 
-import Control.Applicative ((<$>))
+#if MIN_VERSION_base(4,8,0)
+#else
+import Control.Applicative ((<$>), (<*))
+#endif
+
 import Data.Serialize.Get
 import Data.Serialize.Put
 import Data.Map (fromList, lookup, toList, Map)

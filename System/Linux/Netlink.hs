@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 module System.Linux.Netlink
 (   Header(..)
   , Attributes
@@ -24,7 +25,12 @@ module System.Linux.Netlink
 )
 where
 
+#if MIN_VERSION_base(4,8,0)
+#else
 import Control.Applicative ((<$>))
+#endif
+
+
 import Control.Monad (when, replicateM_, unless)
 import Control.Monad.Loops (whileM)
 import Data.Bits (Bits, (.&.))

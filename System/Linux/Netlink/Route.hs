@@ -1,4 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE CPP #-}
 module System.Linux.Netlink.Route
     (
       Packet
@@ -23,7 +24,11 @@ module System.Linux.Netlink.Route
 
 import Prelude hiding (length, lookup, init)
 
-import Control.Applicative ((<$>))
+#if MIN_VERSION_base(4,8,0)
+#else
+import Control.Applicative ((<$>), (<*))
+#endif
+
 import Data.ByteString.Char8 (ByteString, append, init, pack, unpack)
 import Data.Char (chr, ord)
 import Data.Map (insert, lookup)

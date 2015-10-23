@@ -1,5 +1,11 @@
+{-# LANGUAGE CPP #-}
 module System.Linux.Netlink.GeNetlink.NL80211
 where
+
+#if MIN_VERSION_base(4,8,0)
+#else
+import Control.Applicative ((<$>))
+#endif
 
 import Control.Monad (liftM, liftM2, join)
 import Control.Monad.Loops (whileM)
