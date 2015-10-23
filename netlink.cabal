@@ -2,11 +2,11 @@ Name:                netlink
 Version:             1.0.0.0
 Synopsis:            Netlink communication for Haskell
 Description:         Library to comminicate with Linux kernel via Netlink
-Homepage:            http://netlink-hs.googlecode.com/
+Homepage:            https://github.com/Ongy/netlink-hs
 License:             BSD3
 License-file:        LICENSE
 Author:              David Anderson
-Maintainer:          Max Treskin <mtreskin@metachord.com>
+Maintainer:          Markus Ongyerth <ongy@ongy.net>
 Copyright:           Google Inc. 2010
 Stability:           Alpha
 Category:            System
@@ -15,7 +15,7 @@ Cabal-version:       >=1.6
 
 Source-repository head
   type:       git
-  location:   https://github.com/metachord/netlink-hs
+  location:   https://github.com/Ongy/netlink-hs
 
 Library
   Exposed-modules:   System.Linux.Netlink
