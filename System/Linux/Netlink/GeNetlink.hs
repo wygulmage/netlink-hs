@@ -19,12 +19,6 @@ instance Convertable GenlHeader where
   getPut = putGeHeader
   getGet _ = getGenlHeader
 
-data NoData = NoData deriving (Show, Eq)
-
-instance Convertable NoData where
-  getPut _ = return ()
-  getGet _ = return NoData
-
 data GenlData a = GenlData 
     {
       genlDataHeader :: GenlHeader

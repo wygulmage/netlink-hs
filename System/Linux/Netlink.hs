@@ -4,6 +4,7 @@ module System.Linux.Netlink
   , Attributes
   , Packet(..)
   , Convertable(..)
+  , NoData(..)
   , NetlinkSocket
 
   , getPacket
@@ -47,6 +48,13 @@ import System.Linux.Netlink.Helpers
 import System.Linux.Netlink.Constants
 
 --Generic protocol stuff
+
+data NoData = NoData deriving (Show, Eq)
+
+instance Convertable NoData where
+  getPut _ = return ()
+  getGet _ = return NoData
+
 
 
 data Header = Header
