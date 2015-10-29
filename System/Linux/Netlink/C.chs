@@ -40,7 +40,7 @@ import System.Linux.Netlink.Constants (eAF_NETLINK)
 #include <linux/netlink.h>
 
 #c
-typedef struct msghdr msdhdr;
+typedef struct msghdr msghdr;
 typedef struct iovec iovec;
 typedef struct sockaddr_nl sockaddr_nl;
 #endc
