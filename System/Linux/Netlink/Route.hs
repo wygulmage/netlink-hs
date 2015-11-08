@@ -26,7 +26,7 @@ import Prelude hiding (length, lookup, init)
 
 #if MIN_VERSION_base(4,8,0)
 #else
-import Control.Applicative ((<$>), (<*))
+import Control.Applicative ((<$>))
 #endif
 
 import Data.ByteString.Char8 (ByteString, append, init, pack, unpack)
