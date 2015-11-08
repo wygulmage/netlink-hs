@@ -59,7 +59,7 @@ instance Storable SockAddrNetlink where
     poke p (SockAddrNetlink pid) = do
         zero p
         #{poke struct sockaddr_nl, nl_family} p (eAF_NETLINK :: CShort)
-        #{poke struct sockaddr_nl, nl_pid   } p ((fromIntegral pid) :: CUInt)
+        #{poke struct sockaddr_nl, nl_pid   } p (fromIntegral pid :: CUInt)
 
 data IoVec = IoVec (Ptr (), Int)
 
@@ -68,12 +68,12 @@ instance Storable IoVec where
     alignment _ = 4
     peek p = do
         addr <- #{peek struct iovec, iov_base} p
-        len  <- (#{peek struct iovec, iov_len}  p :: IO CSize)
-        return $ IoVec (addr, (fromIntegral len))
+        len  <- #{peek struct iovec, iov_len}  p :: IO CSize
+        return $ IoVec (addr, fromIntegral len)
     poke p (IoVec (addr, len)) = do
         zero p
         #{poke struct iovec, iov_base} p addr
-        #{poke struct iovec, iov_len } p ((fromIntegral len) :: CSize)
+        #{poke struct iovec, iov_len } p (fromIntegral len :: CSize)
 
 data MsgHdr = MsgHdr (Ptr (), Int)
 
@@ -82,14 +82,13 @@ instance Storable MsgHdr where
     alignment _ = 4
     peek p = do
         iov     <- #{peek struct msghdr, msg_iov   } p
-        iovlen  <- (#{peek struct msghdr, msg_iovlen} p :: IO CSize)
+        iovlen  <- #{peek struct msghdr, msg_iovlen} p :: IO CSize
         return $ MsgHdr (iov, fromIntegral iovlen)
     poke p (MsgHdr (iov, iovlen)) = do
         zero p
         #{poke struct msghdr, msg_iov   } p iov
-        #{poke struct msghdr, msg_iovlen} p ((fromIntegral iovlen) :: CSize)
+        #{poke struct msghdr, msg_iovlen} p (fromIntegral iovlen :: CSize)
 
-{- Typedefs for easier use later on #-}
 makeSocket :: IO CInt
 makeSocket = makeSocketGeneric #{const NETLINK_ROUTE}
 
@@ -98,12 +97,9 @@ makeSocket = makeSocketGeneric #{const NETLINK_ROUTE}
 makeSocketGeneric :: Int -> IO CInt
 makeSocketGeneric prot = do
   fd <- throwErrnoIfMinus1 "makeSocket.socket" $
-          (c_socket
-           eAF_NETLINK
-           #{const SOCK_RAW}
-           (fromIntegral prot))
+          c_socket eAF_NETLINK #{const SOCK_RAW} (fromIntegral prot)
   with (SockAddrNetlink 0) $ \addr ->
-    throwErrnoIfMinus1_ "makeSocket.bind" $ do
+    throwErrnoIfMinus1_ "makeSocket.bind" $
       c_bind fd (castPtr addr) #{size struct sockaddr_nl}
   return fd
 
@@ -115,15 +111,14 @@ sendmsg fd bs =
     useManyAsPtrLen bs $ \ptrs ->
     withArrayLen (map IoVec ptrs) $ \iovlen iov ->
     with (MsgHdr (castPtr iov, iovlen)) $ \msg ->
-    throwErrnoIfMinus1_ "sendmsg" $ do
-        c_sendmsg fd (castPtr msg) (0 :: CInt)
+    throwErrnoIfMinus1_ "sendmsg" $c_sendmsg fd (castPtr msg) (0 :: CInt)
 
 recvmsg :: CInt -> Int -> IO ByteString
 recvmsg fd len =
     createAndTrim len $ \ptr ->
     with (IoVec (castPtr ptr, len)) $ \vec ->
     with (MsgHdr (castPtr vec, 1)) $ \msg ->
-    fmap fromIntegral . throwErrnoIf (<= 0) "recvmsg" $ do
+    fmap fromIntegral . throwErrnoIf (<= 0) "recvmsg" $
         c_recvmsg fd (castPtr msg) (0 :: CInt)
 
 useManyAsPtrLen :: [ByteString] -> ([(Ptr (), Int)] -> IO a) -> IO a
@@ -150,5 +145,5 @@ joinMulticastGroup fd fid = do
     poke ptr fid
     c_setsockopt fd sol_netlink 1 (castPtr ptr) size)
   return ()
-  where size = (fromIntegral $sizeOf (undefined :: CInt))
+  where size = fromIntegral $sizeOf (undefined :: CInt)
         sol_netlink = 270 :: CInt

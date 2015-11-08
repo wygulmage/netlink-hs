@@ -112,8 +112,8 @@ getConnectedWifi sock ifindex = filter isConn <$> getScanResults sock ifindex
 
 getWifiAttributes :: NL80211Packet -> Maybe Attributes
 getWifiAttributes (Packet _ _ attrs) =
-  getRight <$> (runGet getWifiEIDs) <$> eids
-  where bssattrs = getRight <$> (runGet getAttributes) <$> M.lookup eNL80211_ATTR_BSS attrs
+  getRight <$> runGet getWifiEIDs <$> eids
+  where bssattrs = getRight <$> runGet getAttributes <$> M.lookup eNL80211_ATTR_BSS attrs
         eids = join $liftM (M.lookup eNL80211_BSS_INFORMATION_ELEMENTS) bssattrs
 getWifiAttributes (ErrorMsg{}) = error "Something stupid happened"
 getWifiAttributes (DoneMsg _) = Nothing
