@@ -1,6 +1,4 @@
 {-# LANGUAGE ForeignFunctionInterface #-}
-{-# LANGUAGE CPP #-}
-{-# OPTIONS_GHC -fno-warn-overlapping-patterns #-}
 module System.Linux.Netlink.C
     (
       makeSocket
@@ -9,13 +7,14 @@ module System.Linux.Netlink.C
     , sendmsg
     , recvmsg
     , joinMulticastGroup
+    )
+where
 
-    , cFromEnum
-    , cToEnum
-    ) where
 
---Don't know how to fis this warning on 7.10 for now :(
+#if MIN_VERSION_base(4,8,0)
+#else
 import Control.Applicative ((<$>), (<*))
+#endif
 
 import Control.Monad (when)
 import Data.ByteString (ByteString)
@@ -39,30 +38,77 @@ import System.Linux.Netlink.Constants (eAF_NETLINK)
 #include <sys/socket.h>
 #include <linux/netlink.h>
 
-#c
-typedef struct msghdr msghdr;
-typedef struct iovec iovec;
-typedef struct sockaddr_nl sockaddr_nl;
-#endc
+foreign import ccall "socket" c_socket :: CInt -> CInt -> CInt -> IO CInt
+foreign import ccall "bind" c_bind :: CInt -> Ptr SockAddrNetlink -> Int -> IO CInt
+foreign import ccall "sendmsg" c_sendmsg :: CInt -> Ptr MsgHdr -> CInt -> IO CInt
+foreign import ccall "recvmsg" c_recvmsg :: CInt -> Ptr MsgHdr -> CInt -> IO CInt
+foreign import ccall "close" c_close :: CInt -> IO CInt
+foreign import ccall "setsockopt" c_setsockopt :: CInt -> CInt -> CInt -> Ptr a -> CInt -> IO CInt
 
+foreign import ccall "memset" c_memset :: Ptr a -> CInt -> CInt -> IO ()
+
+data SockAddrNetlink = SockAddrNetlink Word32
+
+instance Storable SockAddrNetlink where
+    sizeOf    _ = #{size struct sockaddr_nl}
+    alignment _ = 4
+    peek p = do
+        family <- #{peek struct sockaddr_nl, nl_family} p
+        when ((family :: CShort) /= eAF_NETLINK) $ fail "Bad address family"
+        SockAddrNetlink . fromIntegral <$> (#{peek struct sockaddr_nl, nl_pid} p :: IO CUInt)
+    poke p (SockAddrNetlink pid) = do
+        zero p
+        #{poke struct sockaddr_nl, nl_family} p (eAF_NETLINK :: CShort)
+        #{poke struct sockaddr_nl, nl_pid   } p ((fromIntegral pid) :: CUInt)
+
+data IoVec = IoVec (Ptr (), Int)
+
+instance Storable IoVec where
+    sizeOf    _ = #{size struct iovec}
+    alignment _ = 4
+    peek p = do
+        addr <- #{peek struct iovec, iov_base} p
+        len  <- (#{peek struct iovec, iov_len}  p :: IO CSize)
+        return $ IoVec (addr, (fromIntegral len))
+    poke p (IoVec (addr, len)) = do
+        zero p
+        #{poke struct iovec, iov_base} p addr
+        #{poke struct iovec, iov_len } p ((fromIntegral len) :: CSize)
+
+data MsgHdr = MsgHdr (Ptr (), Int)
+
+instance Storable MsgHdr where
+    sizeOf    _ = #{size struct msghdr}
+    alignment _ = 4
+    peek p = do
+        iov     <- #{peek struct msghdr, msg_iov   } p
+        iovlen  <- (#{peek struct msghdr, msg_iovlen} p :: IO CSize)
+        return $ MsgHdr (iov, fromIntegral iovlen)
+    poke p (MsgHdr (iov, iovlen)) = do
+        zero p
+        #{poke struct msghdr, msg_iov   } p iov
+        #{poke struct msghdr, msg_iovlen} p ((fromIntegral iovlen) :: CSize)
+
+{- Typedefs for easier use later on #-}
 makeSocket :: IO CInt
-makeSocket = makeSocketGeneric (cFromEnum Route)
+makeSocket = makeSocketGeneric #{const NETLINK_ROUTE}
+
 
 -- TODO maybe readd the unique thingy (look at git log)
 makeSocketGeneric :: Int -> IO CInt
 makeSocketGeneric prot = do
   fd <- throwErrnoIfMinus1 "makeSocket.socket" $
-          ({#call socket #}
+          (c_socket
            eAF_NETLINK
-           (cFromEnum Raw)
+           #{const SOCK_RAW}
            (fromIntegral prot))
   with (SockAddrNetlink 0) $ \addr ->
     throwErrnoIfMinus1_ "makeSocket.bind" $ do
-      {# call bind #} fd (castPtr addr) {#sizeof sockaddr_nl #}
+      c_bind fd (castPtr addr) #{size struct sockaddr_nl}
   return fd
 
 closeSocket :: CInt -> IO ()
-closeSocket fd = throwErrnoIfMinus1_ "closeSocket" $ {#call close #} fd
+closeSocket fd = throwErrnoIfMinus1_ "closeSocket" $ c_close fd
 
 sendmsg :: CInt -> [ByteString] -> IO ()
 sendmsg fd bs =
@@ -70,7 +116,7 @@ sendmsg fd bs =
     withArrayLen (map IoVec ptrs) $ \iovlen iov ->
     with (MsgHdr (castPtr iov, iovlen)) $ \msg ->
     throwErrnoIfMinus1_ "sendmsg" $ do
-        {#call sendmsg as _sendmsg #} fd (castPtr msg) (0 :: CInt)
+        c_sendmsg fd (castPtr msg) (0 :: CInt)
 
 recvmsg :: CInt -> Int -> IO ByteString
 recvmsg fd len =
@@ -78,52 +124,7 @@ recvmsg fd len =
     with (IoVec (castPtr ptr, len)) $ \vec ->
     with (MsgHdr (castPtr vec, 1)) $ \msg ->
     fmap fromIntegral . throwErrnoIf (<= 0) "recvmsg" $ do
-        {#call recvmsg as _recvmsg #} fd (castPtr msg) (0 :: CInt)
-
-{#enum define PF { NETLINK_ROUTE as Route } #}
-{#enum define ST { SOCK_RAW as Raw } #}
-
-data IoVec = IoVec (Ptr (), Int)
-
-instance Storable IoVec where
-    sizeOf    _ = {#sizeof iovec #}
-    alignment _ = 4
-    peek p = do
-        addr <- {#get iovec.iov_base #} p
-        len  <- {#get iovec.iov_len #}  p
-        return $ IoVec (addr, (fromIntegral len))
-    poke p (IoVec (addr, len)) = do
-        zero p
-        {#set iovec.iov_base #} p addr
-        {#set iovec.iov_len  #} p (fromIntegral len)
-
-data MsgHdr = MsgHdr (Ptr (), Int)
-
-instance Storable MsgHdr where
-    sizeOf    _ = {#sizeof msghdr #}
-    alignment _ = 4
-    peek p = do
-        iov     <- {#get msghdr.msg_iov     #} p
-        iovlen  <- {#get msghdr.msg_iovlen  #} p
-        return $ MsgHdr (iov, fromIntegral iovlen)
-    poke p (MsgHdr (iov, iovlen)) = do
-        zero p
-        {#set msghdr.msg_iov     #} p iov
-        {#set msghdr.msg_iovlen  #} p (fromIntegral iovlen)
-
-data SockAddrNetlink = SockAddrNetlink Word32
-
-instance Storable SockAddrNetlink where
-    sizeOf    _ = {#sizeof sockaddr_nl #}
-    alignment _ = 4
-    peek p = do
-        family <- {#get sockaddr_nl.nl_family #} p
-        when (family /= eAF_NETLINK) $ fail "Bad address family"
-        SockAddrNetlink . fromIntegral <$> {#get sockaddr_nl.nl_pid #} p
-    poke p (SockAddrNetlink pid) = do
-        zero p
-        {#set sockaddr_nl.nl_family #} p eAF_NETLINK
-        {#set sockaddr_nl.nl_pid    #} p (fromIntegral pid)
+        c_recvmsg fd (castPtr msg) (0 :: CInt)
 
 useManyAsPtrLen :: [ByteString] -> ([(Ptr (), Int)] -> IO a) -> IO a
 useManyAsPtrLen bs act =
@@ -138,22 +139,16 @@ sizeOfPtr :: (Storable a, Integral b) => Ptr a -> b
 sizeOfPtr = fromIntegral . sizeOf . (undefined :: Ptr a -> a)
 
 zero :: Storable a => Ptr a -> IO ()
-zero p = void $ {#call memset #} (castPtr p) 0 (sizeOfPtr p)
+zero p = void $ c_memset (castPtr p) 0 (sizeOfPtr p)
 
 void :: Monad m => m a -> m ()
 void act = act >> return ()
-
-cFromEnum :: (Enum e, Integral i) => e -> i
-cFromEnum = fromIntegral . fromEnum
-
-cToEnum :: (Integral i, Enum e) => i -> e
-cToEnum = toEnum . fromIntegral
 
 joinMulticastGroup :: CInt -> Word32 -> IO ()
 joinMulticastGroup fd fid = do
   _ <- throwErrnoIfMinus1 "joinMulticast" $alloca ( \ptr -> do
     poke ptr fid
-    {#call setsockopt as _setsockopt #} fd sol_netlink 1 (castPtr ptr) size)
+    c_setsockopt fd sol_netlink 1 (castPtr ptr) size)
   return ()
   where size = (fromIntegral $sizeOf (undefined :: CInt))
         sol_netlink = 270 :: CInt

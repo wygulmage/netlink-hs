@@ -40,7 +40,7 @@ import Data.ByteString (ByteString)
 import Data.Map (Map, fromList, toList)
 import Data.Serialize.Get
 import Data.Serialize.Put
-import Data.Word (Word8, Word16, Word32)
+import Data.Word (Word16, Word32)
 import Foreign.C.Types (CInt)
 
 import qualified System.Linux.Netlink.C as C
