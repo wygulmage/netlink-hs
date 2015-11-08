@@ -6,4 +6,4 @@ ghc:
   - 7.6
 
 #Overwrite the test script, since we don't have any tests
-script: export PATH=~/.cabal/bin:${PATH} && cabal install alex happy && cabal install c2hs && c2hs -v && cabal install --only-dependencies && cabal configure && cabal build
+script: cabal install --only-dependencies && cabal configure && cabal build
