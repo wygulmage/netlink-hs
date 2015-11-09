@@ -1,8 +1,31 @@
 {-# LANGUAGE CPP #-}
+{-|
+Module      : System.Linux.Netlink.GeNetlink.Control
+Description : This module implements the control protocol of genetlink
+Maintainer  : ongy
+Stability   : testing
+Portability : Linux
+
+This module provides utility functions and datatypes for the genetlink control
+protocol.
+This has to be used by implementations of netlink families based on genetlink
+to lookup their current id, since that is determined at runtime.
+-}
+
 module System.Linux.Netlink.GeNetlink.Control
-(getFamilyId, CtrlAttribute(..), CtrlAttrMcastGroup(..), CtrlPacket(..),
-CTRLPacket, ctrlPacketFromGenl, CtrlAttrOpData(..), ctrlPackettoGenl,
-getFamilyWithMulticasts, getMulticastGroups, getMulticast)
+  ( getFamilyId
+  , CtrlAttribute(..)
+  , CtrlAttrMcastGroup(..)
+  , CtrlPacket(..)
+  , CTRLPacket
+  , ctrlPacketFromGenl
+  , CtrlAttrOpData(..)
+
+  , ctrlPackettoGenl
+  , getFamilyWithMulticasts
+  , getMulticastGroups
+  , getMulticast
+  )
 where
 
 #if MIN_VERSION_base(4,8,0)
@@ -26,10 +49,12 @@ import System.Linux.Netlink.GeNetlink.Constants
 import System.Linux.Netlink.Constants
 import System.Linux.Netlink
 
-
+-- |Datatype for multicast groups as returned by the control protocol
 data CtrlAttrMcastGroup = CAMG {grpName :: String, grpId :: Word32 } deriving (Eq, Show)
+-- |Datatype for AttrOpData as returned by the control protocol
 data CtrlAttrOpData = CAO {opId :: Word32, opFlags :: Word32 } deriving (Eq, Show)
 
+-- |Attributes defined by the control family
 data CtrlAttribute =
   CTRL_ATTR_UNSPEC       ByteString |
   CTRL_ATTR_FAMILY_ID    Word16 |
@@ -43,6 +68,7 @@ data CtrlAttribute =
   deriving (Eq, Show)
 
 
+-- |Typesafe control packet
 data CtrlPacket = CtrlPacket
     {
       ctrlHeader     :: Header
@@ -50,7 +76,7 @@ data CtrlPacket = CtrlPacket
     , ctrlAttributes :: [CtrlAttribute]
     } deriving (Eq, Show)
 
-
+-- |typedef for control messages
 type CTRLPacket = GenlPacket NoData
 
 -- TODO fix error handling for nested arguments
@@ -112,6 +138,7 @@ makeAttribute i x
 ctrlAttributesFromAttributes :: Map Int ByteString -> [CtrlAttribute]
 ctrlAttributesFromAttributes = map getAttribute . toList
 
+-- |Convert "normal" 'Packet's into typesafe 'CtrlPacket's
 ctrlPacketFromGenl :: CTRLPacket -> CtrlPacket
 ctrlPacketFromGenl (Packet h g attrs) = CtrlPacket h (genlDataHeader g) a
   where a = ctrlAttributesFromAttributes attrs
@@ -139,6 +166,7 @@ ctrlAttributesToAttribute :: CtrlAttribute -> (Int, ByteString)
 ctrlAttributesToAttribute = cATA
 
 
+-- |Convert the typesafe 'CtrPacket' into a 'CTRLPacket' so it can be sent
 ctrlPackettoGenl :: CtrlPacket -> CTRLPacket
 ctrlPackettoGenl (CtrlPacket h g attrs)= Packet h (GenlData g NoData) a
   where a = fromList $map ctrlAttributesToAttribute attrs
@@ -159,9 +187,11 @@ familyIdRequest name = let
   attrs = fromList [(eCTRL_ATTR_FAMILY_NAME, pack name `append` pack "\0")] in
     Packet header (GenlData geheader NoData) attrs
 
+-- |Get the id for a netlink family by name
 getFamilyId :: NetlinkSocket -> String -> IO Word16
 getFamilyId s m = fmap fst (getFamilyWithMulticasts s m)
 
+-- |get the id and multicast groups of a netlink family by name
 getFamilyWithMulticasts :: NetlinkSocket -> String -> IO (Word16, [CtrlAttrMcastGroup])
 getFamilyWithMulticasts sock name = do
   (CtrlPacket _ _ attrs) <- ctrlPacketFromGenl <$> queryOne sock (familyIdRequest name)
@@ -170,6 +200,7 @@ getFamilyWithMulticasts sock name = do
         getIdFromList (_:xs) = getIdFromList xs
         getIdFromList [] = -1
 
+-- |get the mutlicast groups of a netlink family by id
 getMulticastGroups :: NetlinkSocket -> Word16 -> IO [CtrlAttrMcastGroup]
 getMulticastGroups sock fid = do
   (CtrlPacket _ _ attrs) <- ctrlPacketFromGenl <$> queryOne sock (familyMcastRequest fid)
@@ -180,6 +211,7 @@ getMCFromList (CTRL_ATTR_MCAST_GROUPS x:_) = x
 getMCFromList (_:xs) = getMCFromList xs
 getMCFromList [] = []
 
+-- |Get id of multicast group by name
 getMulticast :: String -> [CtrlAttrMcastGroup] -> Maybe Word32
 getMulticast _ [] = Nothing
 getMulticast name (CAMG gname gid:xs) = if name == gname

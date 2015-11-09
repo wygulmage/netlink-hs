@@ -1,4 +1,14 @@
 {-# LANGUAGE ForeignFunctionInterface #-}
+{-|
+Module      : System.Linux.Netlink.C
+Description : A module to bridge the haskell code to underlying C code
+Maintainer  : ongy
+Stability   : testing
+Portability : Linux
+
+I consider this module internal.
+The documentation may be a bit sparse.
+-}
 module System.Linux.Netlink.C
     (
       makeSocket
@@ -38,6 +48,8 @@ import System.Linux.Netlink.Constants (eAF_NETLINK)
 #include <sys/socket.h>
 #include <linux/netlink.h>
 
+-- TODO should these be safe or unsafe?
+-- FFI declarations for syscalls
 foreign import ccall "socket" c_socket :: CInt -> CInt -> CInt -> IO CInt
 foreign import ccall "bind" c_bind :: CInt -> Ptr SockAddrNetlink -> Int -> IO CInt
 foreign import ccall "sendmsg" c_sendmsg :: CInt -> Ptr MsgHdr -> CInt -> IO CInt
@@ -89,12 +101,16 @@ instance Storable MsgHdr where
         #{poke struct msghdr, msg_iov   } p iov
         #{poke struct msghdr, msg_iovlen} p (fromIntegral iovlen :: CSize)
 
+
+-- |Create a netlink socket, for legacy reasons this will be of the route family
 makeSocket :: IO CInt
 makeSocket = makeSocketGeneric #{const NETLINK_ROUTE}
 
-
 -- TODO maybe readd the unique thingy (look at git log)
-makeSocketGeneric :: Int -> IO CInt
+-- |Create any netlink socket
+makeSocketGeneric 
+  :: Int -- ^The netlink family to use
+  -> IO CInt
 makeSocketGeneric prot = do
   fd <- throwErrnoIfMinus1 "makeSocket.socket" $
           c_socket eAF_NETLINK #{const SOCK_RAW} (fromIntegral prot)
@@ -103,9 +119,12 @@ makeSocketGeneric prot = do
       c_bind fd (castPtr addr) #{size struct sockaddr_nl}
   return fd
 
+
+-- |Close a socket when it is not needed anymore
 closeSocket :: CInt -> IO ()
 closeSocket fd = throwErrnoIfMinus1_ "closeSocket" $ c_close fd
 
+-- |Send a message over a socket.
 sendmsg :: CInt -> [ByteString] -> IO ()
 sendmsg fd bs =
     useManyAsPtrLen bs $ \ptrs ->
@@ -113,6 +132,7 @@ sendmsg fd bs =
     with (MsgHdr (castPtr iov, iovlen)) $ \msg ->
     throwErrnoIfMinus1_ "sendmsg" $c_sendmsg fd (castPtr msg) (0 :: CInt)
 
+-- |Receive a message over a socket.
 recvmsg :: CInt -> Int -> IO ByteString
 recvmsg fd len =
     createAndTrim len $ \ptr ->
@@ -139,6 +159,8 @@ zero p = void $ c_memset (castPtr p) 0 (sizeOfPtr p)
 void :: Monad m => m a -> m ()
 void act = act >> return ()
 
+
+-- |Join a netlink multicast group
 joinMulticastGroup :: CInt -> Word32 -> IO ()
 joinMulticastGroup fd fid = do
   _ <- throwErrnoIfMinus1 "joinMulticast" $alloca ( \ptr -> do

@@ -15,6 +15,7 @@ main = do
     enums <- getEnums inc
     let (exports, definitions) = outputs defines enums
         prelude = [
+            "{-# OPTIONS_HADDOCK hide, prune, ignore-exports #-}",
             "{-# LANGUAGE GeneralizedNewtypeDeriving #-}",
             "module System.Linux.Netlink.GeNetlink.Constants (" ++
             join (intersperse ", " $ join exports) ++
