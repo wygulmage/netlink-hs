@@ -29,6 +29,7 @@ module System.Linux.Netlink
 
   , makeSocket
   , makeSocketGeneric
+  , getNetlinkFd
   , closeSocket
   , joinMulticastGroup
 
@@ -44,6 +45,8 @@ import Control.Applicative ((<$>))
 #endif
 
 
+import Data.List (intersperse)
+import Hexdump (prettyHex)
 import Control.Monad (when, replicateM_, unless)
 import Control.Monad.Loops (whileM)
 import Data.Bits (Bits, (.&.))
@@ -55,6 +58,7 @@ import Data.Serialize.Put
 import Data.Word (Word16, Word32)
 import Foreign.C.Types (CInt)
 
+import System.Posix.Types (Fd(Fd))
 import qualified System.Linux.Netlink.C as C
 import System.Linux.Netlink.Helpers
 import System.Linux.Netlink.Constants
@@ -88,8 +92,11 @@ data Header = Header
     , messageFlags  :: Word16 -- ^The message flags
     , messageSeqNum :: Word32 -- ^The sequence message number
     , messagePID    :: Word32 -- ^The pid of the sending process (0 is from kernel for receiving or "let the kernel set it" for sending)
-    } deriving (Eq, Show)
+    } deriving (Eq)
 
+instance Show Header where
+  show (Header t f s p) = 
+    "Type: " ++ show t ++ ", Flags: " ++ (show f) ++ ", Seq: " ++ show s ++ ", Pid: " ++ show p
 
 -- |Type used for netlink attributes
 type Attributes = Map Int ByteString
@@ -112,7 +119,25 @@ data Packet a
     {
       packetHeader     :: Header -- ^The header of the done message
     }
-    deriving (Eq, Show)
+    deriving (Eq)
+
+instance Show a => Show (Packet a) where
+  showList xs = ((concat . intersperse "===\n" . map show $xs) ++)
+  show (ErrorMsg hdr code pack) = 
+    "Error packet: \n" ++
+    show hdr ++ "\n" ++
+    "Error code: " ++ (show code) ++ "\n" ++
+    (show pack)
+  show (DoneMsg hdr) = "Done: " ++ show hdr
+  show (Packet hdr cus attrs) =
+    "NetlinkPacket: " ++ show hdr ++ "\n" ++
+    "Custom data: " ++ show cus ++ "\n" ++
+    "Attrs: \n" ++ showNLAttrs attrs
+
+showNLAttrs :: Attributes -> String
+showNLAttrs = showAttrs . toList
+  where showAttrs [] = "\n"
+        showAttrs ((i,v):xs) = show i ++ ": " ++ prettyHex v ++ showAttrs xs
 
 -- | Read packets from the buffer
 getPacket 
@@ -231,6 +256,9 @@ makeSocketGeneric
   :: Int -- ^The netlink family to use
   -> IO NetlinkSocket
 makeSocketGeneric = fmap NS . C.makeSocketGeneric
+
+getNetlinkFd :: NetlinkSocket -> Fd
+getNetlinkFd (NS f) = Fd f
 
 {- |Send a Message over netlink.
 

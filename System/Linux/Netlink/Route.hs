@@ -13,6 +13,7 @@ This module provides wrappers for functionality provided by the netlink route fa
 module System.Linux.Netlink.Route
     (
       Packet
+    , RoutePacket
 
     , getRoutePackets
     , Message(..)
@@ -64,7 +65,14 @@ data Message = NLinkMsg
     , addrFlags          :: Word8
     , addrScope          :: Word8
     , addrInterfaceIndex :: Word32
-    } deriving (Eq, Show)
+    } deriving (Eq)
+
+instance Show Message where
+  show (NLinkMsg t i f) =
+    "LinkMessage. Type: " ++ show t ++ ", Index: " ++ show i ++ ", Flags: " ++ show f
+  show (NAddrMsg f l fl s i) =
+    "AddrMessage. Family: " ++ show f ++ ", MLength: " ++ show l ++ ", Flags: " ++ 
+    show fl ++ ", Scope: " ++ show s ++ ", Index: " ++ show i
 
 instance Convertable Message where
   getGet = getMessage
