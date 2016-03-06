@@ -23,6 +23,7 @@ module System.Linux.Netlink.GeNetlink.NL80211
   , getConnectedWifi
   , getWifiAttributes
   , getPaket
+  , getFd
   )
 where
 
@@ -43,7 +44,7 @@ import Data.Word (Word32, Word16, Word8)
 import qualified Data.ByteString as BS
 import qualified Data.Map as M (empty, lookup, fromList, member)
 
-
+import System.Posix.Types (Fd)
 
 import System.Linux.Netlink.Constants
 import System.Linux.Netlink.GeNetlink
@@ -62,6 +63,9 @@ type NL80211Packet = GenlPacket NoData
 
 -- |typedef for lazyness
 type ByteString = BS.ByteString --the name would just annoy me
+
+getFd :: NL80211Socket -> Fd
+getFd (NLS s _) = getNetlinkFd s
 
 -- |'Get' the EID Attributes from a buffer
 getWifiEIDs :: Get Attributes
@@ -163,7 +167,12 @@ getConnectedWifi
   -> IO [NL80211Packet]
 getConnectedWifi sock ifindex = filter isConn <$> getScanResults sock ifindex
   where isConn (Packet _ _ attrs) = hasConn $M.lookup eNL80211_ATTR_BSS attrs
-        isConn (ErrorMsg{}) = error "Something stupid happened"
+  -- -16 is -EBUSY, which will be returned IF and (as far as I could see) only IF another dump
+  -- is already in progress, so retrying should get something useful
+  -- For other error codes we don't know for sure and want to return the error to the user
+        isConn x@(ErrorMsg _ e _) = if e == (-16)
+          then False
+          else error ("Something stupid happened" ++ show x)
         isConn (DoneMsg _) = False
         hasConn Nothing = False
         hasConn (Just attrs) = M.member eNL80211_BSS_STATUS $getRight $runGet getAttributes attrs
@@ -175,7 +184,7 @@ getWifiAttributes (Packet _ _ attrs) =
   getRight <$> runGet getWifiEIDs <$> eids
   where bssattrs = getRight <$> runGet getAttributes <$> M.lookup eNL80211_ATTR_BSS attrs
         eids = join $liftM (M.lookup eNL80211_BSS_INFORMATION_ELEMENTS) bssattrs
-getWifiAttributes (ErrorMsg{}) = error "Something stupid happened"
+getWifiAttributes x@(ErrorMsg{}) = error ("Something stupid happened" ++ show x)
 getWifiAttributes (DoneMsg _) = Nothing
 
 
