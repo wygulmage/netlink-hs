@@ -1,4 +1,5 @@
 {-# LANGUAGE CPP #-}
+
 {-|
 Module      : System.Linux.Netlink
 Description : The base module for the netlink package
@@ -36,6 +37,7 @@ module System.Linux.Netlink
   , query
   , queryOne
   , recvOne
+  , showNLAttrs
 )
 where
 
@@ -121,7 +123,7 @@ data Packet a
     }
     deriving (Eq)
 
-instance Show a => Show (Packet a) where
+instance {-# OVERLAPPABLE #-} Show a => Show (Packet a) where
   showList xs = ((concat . intersperse "===\n" . map show $xs) ++)
   show (ErrorMsg hdr code pack) = 
     "Error packet: \n" ++

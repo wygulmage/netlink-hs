@@ -1,5 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE TypeSynonymInstances #-}
+{-# LANGUAGE FlexibleInstances #-}
 
 {-|
 Module      : System.Linux.Netlink.Route
@@ -42,6 +44,7 @@ import Control.Applicative ((<$>))
 
 import Data.ByteString.Char8 (ByteString, append, init, pack, unpack)
 import Data.Char (chr, ord)
+import Data.List (intersperse)
 import Data.Map (insert, lookup)
 import Data.Serialize.Get
 import Data.Serialize.Put
@@ -81,10 +84,18 @@ instance Convertable Message where
 -- |Typedef for route messages
 type RoutePacket = Packet Message
 
---
--- Generic functions
---
-
+instance Show RoutePacket where
+  showList xs = ((concat . intersperse "===\n" . map show $xs) ++)
+  show (DoneMsg hdr) = "Done: " ++ show hdr
+  show (Packet hdr cus attrs) =
+    "RoutePacket: " ++ show hdr ++ "\n" ++
+    show cus ++ "\n" ++
+    "Attrs: \n" ++ showNLAttrs attrs
+  show (ErrorMsg hdr code packet) = 
+    "Error packet: \n" ++
+    show hdr ++ "\n" ++
+    "Error code: " ++ (show code) ++ "\n" ++
+    (show packet)
 
 
 --TODO maybe this should be changed
