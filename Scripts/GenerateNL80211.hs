@@ -34,7 +34,9 @@ outputs _ e = let {-define r = selectDefines r d-}
        , mkEnum "NL80211Bss" . bssenum $selectEnums "^NL80211_BSS_" e
        ]
 
-  where bssenum = head . noChanWidth . noBssStatus
+  where bssenum = getFirst . noChanWidth . noBssStatus
+        getFirst (x:_) = x
+        getFirst [] = error "Couldn't find the bssenum enum in files"
         noChanWidth = filter (all (not . isInfixOf "CHAN_WIDTH_") . keys)
         noBssStatus = filter (all (not . isInfixOf "BSS_STATUS_") . keys)
 

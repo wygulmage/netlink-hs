@@ -75,7 +75,9 @@ selectDefines :: String -> Map String Integer -> Map String Integer
 selectDefines regex = filterWithKey (\k _ -> k =~ regex)
 
 selectEnum :: String -> [Map String Integer] -> Map String Integer
-selectEnum regex = head . selectEnums regex
+selectEnum regex m = case selectEnums regex m of
+  (x:_) -> x
+  [] -> error ("Couldn't find enum for " ++ regex)
 
 selectEnums :: String -> [Map String Integer] -> [Map String Integer]
 selectEnums regex = filter (all (=~ regex) . keys)
@@ -127,17 +129,16 @@ sanitize [] = []
 getDefinitions :: String -> IO (Map String Integer)
 getDefinitions headers = do
     defines <- map words . lines <$> readDefines headers
-    let isDefine (c:n:_) = c == "#define" && '(' `notElem` n && head n /= '_' 
+    let isDefine (c:n:_) = c == "#define" && '(' `notElem` n && not ("_" `isPrefixOf` n)
         isDefine xs = error ("isDefine: Couldn't check: " ++ show xs)
         hasValue = (>= 3) . length
         names = map (!! 1) $ filter (\d -> isDefine d && hasValue d) defines
         kludge = map (\n -> "@define \"" ++ n ++ "\" " ++ n) names
     defines2 <- map words . lines <$> preprocess (headers ++ unlines kludge)
     let isInteresting d = hasValue d &&
-                           head d == "@define" &&
-                           (all isNumber (d !! 2) ||
-                            "0x" `isPrefixOf` (d !! 2) &&
-                            all isNumber (drop 2 (d !! 2)))
+                          ["@define"] `isPrefixOf` d &&
+                          (all isNumber (d !! 2) || "0x" `isPrefixOf` (d !! 2) &&
+                           all isNumber (drop 2 (d !! 2)))
         realDefines = map (take 2 . drop 1) $ filter isInteresting $ sanitize defines2
         clean [k,v] = (init (tail k), read v)
         clean _ = error "Clean: got a weird list"

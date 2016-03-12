@@ -318,15 +318,15 @@ queryOne :: (Convertable a, Eq a, Show a) => NetlinkSocket -> Packet a -> IO (Pa
 queryOne sock req = do
     sendmsg sock (putPacket req)
     pkts <- recvMulti sock
-    let len = length pkts
-    when (len /= 1) $ fail ("Expected one packet, received " ++ show len)
-    return $ head pkts
+    case pkts of
+      [x] -> return x
+      _ -> fail ("Expected one packet, received " ++ (show . length $pkts))
 
 -- |Internal function to receive multiple netlink messages
 recvMulti :: (Convertable a, Eq a, Show a) => NetlinkSocket -> IO [Packet a]
 recvMulti sock = do
     pkts <- recvOne sock
-    if isMulti (head pkts)
+    if isMulti (first pkts)
         then if isDone (last pkts)
              then return $ init pkts
              else (pkts ++) <$> recvMulti sock
@@ -334,6 +334,8 @@ recvMulti sock = do
   where
     isMulti = isFlagSet fNLM_F_MULTI . messageFlags . packetHeader
     isDone  = (== eNLMSG_DONE) . messageType . packetHeader
+    first (x:_) = x
+    first [] = error "Got empty list from recvOne in recvMulti, this shouldn't happen"
 
 {- | Calls recvmsg once and returns all received messages
 
