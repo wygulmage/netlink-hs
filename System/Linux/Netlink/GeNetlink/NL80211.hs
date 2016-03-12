@@ -85,7 +85,7 @@ instance Show NL80211Packet where
 
 showNL80211Command :: (GenlData NoData80211) -> String
 showNL80211Command (GenlData (GenlHeader cmd _) _ ) =
-  showNL80211Commands cmd ++ "\n"
+  showNL80211Commands cmd
 
 -- |typedef for lazyness
 type ByteString = BS.ByteString --the name would just annoy me
