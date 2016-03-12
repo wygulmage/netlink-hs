@@ -328,6 +328,7 @@ recvMulti sock = do
     pkts <- recvOne sock
     if isMulti (first pkts)
         then if isDone (last pkts)
+             -- This is fine because first would have complained before
              then return $ init pkts
              else (pkts ++) <$> recvMulti sock
         else return pkts

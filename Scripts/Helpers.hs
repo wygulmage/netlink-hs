@@ -140,7 +140,7 @@ getDefinitions headers = do
                           (all isNumber (d !! 2) || "0x" `isPrefixOf` (d !! 2) &&
                            all isNumber (drop 2 (d !! 2)))
         realDefines = map (take 2 . drop 1) $ filter isInteresting $ sanitize defines2
-        clean [k,v] = (init (tail k), read v)
+        clean [(_:k),v] = (init k, read v)
         clean _ = error "Clean: got a weird list"
     return $ fromList (map clean realDefines)
   where readDefines = readProcess "gcc" ["-E", "-dM", "-"]

@@ -143,7 +143,8 @@ query (NLS sock fid) cmd dump attrs = I.query sock packet
 
 
 parseInterface :: (ByteString, ByteString) -> (String, Word32)
-parseInterface (name, ifindex) =
+parseInterface (name, ifindex) = 
+  --This init is ok because the name will always have a \0
   (init $unpack name, getRight $runGet getWord32host ifindex)
 
 
