@@ -26,6 +26,7 @@ module System.Linux.Netlink.GeNetlink.NL80211
   , getWifiAttributes
   , getPaket
   , getFd
+  , getMulticastGroups
   )
 where
 
@@ -51,7 +52,8 @@ import System.Posix.Types (Fd)
 
 import System.Linux.Netlink.Constants
 import System.Linux.Netlink.GeNetlink
-import System.Linux.Netlink.GeNetlink.Control
+import System.Linux.Netlink.GeNetlink.Control hiding (getMulticastGroups)
+import qualified System.Linux.Netlink.GeNetlink.Control as C
 import System.Linux.Netlink.GeNetlink.NL80211.Constants
 import System.Linux.Netlink hiding (makeSocket, queryOne, query, recvOne)
 import qualified System.Linux.Netlink as I (queryOne, query, recvOne)
@@ -117,12 +119,15 @@ makeNL80211Socket = do
 -- |Join a nl80211 multicast group by name
 joinMulticastByName :: NL80211Socket -> String -> IO ()
 joinMulticastByName (NLS sock _) name = do
-  (_, m)<-  getFamilyWithMulticasts sock "nl80211"
+  (_, m) <- getFamilyWithMulticasts sock "nl80211"
   let gid = getMulticast name m
   case gid of
     Nothing -> error $"Could not find \"" ++ name  ++ "\" multicast group"
     Just x -> joinMulticastGroup sock x
 
+getMulticastGroups :: NL80211Socket -> IO [String]
+getMulticastGroups (NLS sock fid) =
+  map grpName <$> C.getMulticastGroups sock fid
 
 getRequestPacket :: Word16 -> Word8 -> Bool -> Attributes -> NL80211Packet
 getRequestPacket fid cmd dump attrs =
