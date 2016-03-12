@@ -36,7 +36,6 @@ import Control.Applicative ((<$>))
 import Data.Serialize.Get
 import Data.Serialize.Put
 import Data.Map (fromList, lookup, toList, Map)
-import Control.Monad (liftM, liftM2, join)
 import Data.ByteString (ByteString, append, empty)
 import Data.ByteString.Char8 (pack, unpack)
 import Data.Word (Word16, Word32)
@@ -96,11 +95,12 @@ e2M (Right x) = Just x
 e2M _ = Nothing
 
 getMcastGroupAttr :: (Int, ByteString) -> Maybe CtrlAttrMcastGroup
-getMcastGroupAttr (_, x) = 
-  let name = join $liftM (lookup (eCTRL_ATTR_MCAST_GRP_NAME :: Int)) attrs
-      fid  = join $liftM (lookup (eCTRL_ATTR_MCAST_GRP_ID :: Int)) attrs in
-    liftM2 CAMG (fmap (init . unpack) name) (getW32 =<< fid)
-  where attrs = e2M $runGet getAttributes x
+getMcastGroupAttr (_, x) = do
+  attrs <- e2M $runGet getAttributes x
+  name <- lookup eCTRL_ATTR_MCAST_GRP_NAME attrs
+  fid  <- lookup eCTRL_ATTR_MCAST_GRP_ID attrs
+  -- This init is ok because the name will always have the \0
+  CAMG (init . unpack $ name) <$> getW32 fid
 
 getMcastGroupAttrs :: ByteString -> Maybe [CtrlAttrMcastGroup]
 getMcastGroupAttrs x = case runGet getAttributes x of
@@ -108,15 +108,15 @@ getMcastGroupAttrs x = case runGet getAttributes x of
   _ -> Nothing
 
 getOpAttr :: (Int, ByteString) -> Maybe CtrlAttrOpData
-getOpAttr (_, x) =
-  let oid = join $liftM (lookup (eCTRL_ATTR_OP_ID :: Int)) attrs
-      ofl  = join $liftM (lookup (eCTRL_ATTR_OP_FLAGS :: Int)) attrs in
-    liftM2 CAO (getW32 =<< oid) (getW32 =<< ofl)
-  where attrs = e2M $runGet getAttributes x
+getOpAttr (_, x) = do
+  attrs <- e2M $runGet getAttributes x
+  oid <- getW32 =<< lookup eCTRL_ATTR_OP_ID attrs
+  ofl <- getW32 =<< lookup eCTRL_ATTR_OP_FLAGS attrs
+  return $ CAO oid ofl
 
 getOpAttrs :: ByteString -> Maybe [CtrlAttrOpData]
 getOpAttrs x = case runGet getAttributes x of
-  (Right y) -> sequence $map getOpAttr $toList y
+  (Right y) -> sequence . map getOpAttr $ toList y
   _ -> Nothing
 
 getAttribute :: (Int, ByteString) -> CtrlAttribute
