@@ -9,9 +9,12 @@ GeNetlink is used as multiplexer since netlink only supports 32 families.
 
 This module provides the basic datatypes used by genetlink.
 -}
+{-# LANGUAGE TypeSynonymInstances #-}
+{-# LANGUAGE FlexibleInstances #-}
 module System.Linux.Netlink.GeNetlink
 where
 
+import Data.List (intersperse)
 import Data.Serialize.Get
 import Data.Serialize.Put
 import Data.Word (Word8)
@@ -27,7 +30,7 @@ data GenlHeader = GenlHeader
     {
       genlCmd     :: Word8
     , genlVersion :: Word8
-    } deriving (Eq, Show)
+    } deriving (Eq)
 
 -- |The 'Convertable' instance for 'GenlHeader'
 instance Convertable GenlHeader where
@@ -43,7 +46,7 @@ data GenlData a = GenlData
     {
       genlDataHeader :: GenlHeader
     , genlDataData   :: a
-    } deriving (Eq, Show)
+    } deriving (Eq)
 
 -- |The 'Convertable' instance for 'GenlData'
 instance Convertable a => Convertable (GenlData a) where
@@ -56,6 +59,29 @@ instance Convertable a => Convertable (GenlData a) where
 -- |Type declaration for genetlink packets
 type GenlPacket a = Packet (GenlData a)
 
+instance Show GenlHeader where
+  show (GenlHeader cmd ver) =
+    "Header: Cmd = " ++ show cmd ++ ", Version: " ++ show ver ++ "\n"
+
+instance {-# OVERLAPPABLE #-} Show a => Show (GenlData a) where
+  show (GenlData hdr content) =
+    show hdr ++ show content
+
+instance Show (GenlData NoData) where
+  show (GenlData hdr _) =
+    show hdr
+
+instance {-# OVERLAPPABLE #-} Show a => Show (GenlPacket a) where
+  showList xs = ((concat . intersperse "===\n" . map show $xs) ++)
+  show (ErrorMsg hdr code pack) = 
+    "Error packet: \n" ++
+    show hdr ++ "\n" ++
+    "Error code: " ++ (show code) ++ "\n" ++
+    (show pack)
+  show (DoneMsg hdr) = "Done: " ++ show hdr
+  show (Packet _ cus attrs) =
+    "GenlPacket: " ++ show cus ++ "\n" ++
+    "Attrs: \n" ++ showNLAttrs attrs
 
 -- |'Get' function for 'GenlHeader'
 getGenlHeader :: Get GenlHeader

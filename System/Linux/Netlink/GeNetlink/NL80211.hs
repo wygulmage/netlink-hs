@@ -1,4 +1,6 @@
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE TypeSynonymInstances #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-|
 Module      : System.Linux.Netlink.GeNetlink.NL80211
 Description : Implementation of NL80211
@@ -36,6 +38,7 @@ import Control.Monad (liftM, liftM2, join)
 import Control.Monad.Loops (whileM)
 import Data.Bits ((.|.))
 import Data.ByteString.Char8 (unpack)
+import Data.List (intersperse)
 import Data.Maybe (mapMaybe)
 import Data.Serialize.Get (runGet, getByteString, getWord8 ,getWord32host, isEmpty, Get)
 import Data.Serialize.Put (runPut, putWord32host)
@@ -58,8 +61,31 @@ import qualified System.Linux.Netlink as I (queryOne, query, recvOne)
 -- |Wrapper for 'NetlinkSocket' we also need the family id for messages we construct
 data NL80211Socket = NLS NetlinkSocket Word16
 
+data NoData80211 = NoData80211 deriving (Eq, Show)
+
+instance Convertable NoData80211 where
+  getPut _ = return ()
+  getGet _ = return NoData80211
+
 -- |typedef for messages send by this mdoule
-type NL80211Packet = GenlPacket NoData
+type NL80211Packet = GenlPacket NoData80211
+
+instance Show NL80211Packet where
+  showList xs = ((concat . intersperse "===\n" . map show $xs) ++)
+  show (DoneMsg hdr) = "Done: " ++ show hdr
+  show (ErrorMsg hdr code packet) = 
+    "Error packet: \n" ++
+    show hdr ++ "\n" ++
+    "Error code: " ++ (show code) ++ "\n" ++
+    (show packet)
+  show (Packet _ cus attrs) =
+    "NL80211Packet: " ++ showNL80211Command cus ++ "\n" ++
+    --TODO: is this the case every time? maybe match on other to get which enum to use
+    "Attrs: \n" ++ showAttrs showNL80211Attrs attrs
+
+showNL80211Command :: (GenlData NoData80211) -> String
+showNL80211Command (GenlData (GenlHeader cmd _) _ ) =
+  showNL80211Commands cmd ++ "\n"
 
 -- |typedef for lazyness
 type ByteString = BS.ByteString --the name would just annoy me
@@ -106,7 +132,7 @@ getRequestPacket :: Word16 -> Word8 -> Bool -> Attributes -> NL80211Packet
 getRequestPacket fid cmd dump attrs =
   let header = Header (fromIntegral fid) flags 0 0
       geheader = GenlHeader cmd 0 in
-    Packet header (GenlData geheader NoData) attrs
+    Packet header (GenlData geheader NoData80211) attrs
   where flags = if dump then fNLM_F_REQUEST .|. fNLM_F_MATCH .|. fNLM_F_ROOT else fNLM_F_REQUEST
 
 
@@ -166,7 +192,8 @@ getConnectedWifi
   -> Word32 -- ^The id of the interface for which this should be looked up
   -> IO [NL80211Packet]
 getConnectedWifi sock ifindex = filter isConn <$> getScanResults sock ifindex
-  where isConn (Packet _ _ attrs) = hasConn $M.lookup eNL80211_ATTR_BSS attrs
+  where isConn :: NL80211Packet -> Bool
+        isConn (Packet _ _ attrs) = hasConn $M.lookup eNL80211_ATTR_BSS attrs
   -- -16 is -EBUSY, which will be returned IF and (as far as I could see) only IF another dump
   -- is already in progress, so retrying should get something useful
   -- For other error codes we don't know for sure and want to return the error to the user
