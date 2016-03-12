@@ -85,6 +85,7 @@ showNL80211Command (GenlData (GenlHeader cmd _) _ ) =
 -- |typedef for lazyness
 type ByteString = BS.ByteString --the name would just annoy me
 
+-- |Get the raw fd from a 'NL80211Socket'. This can be used for eventing
 getFd :: NL80211Socket -> Fd
 getFd (NLS s _) = getNetlinkFd s
 

@@ -125,6 +125,7 @@ data Packet a
     }
     deriving (Eq)
 
+-- |Helperfunction for show instance of 'Packet' and further specializations
 showPacket :: Show a => Packet a -> String
 showPacket (ErrorMsg hdr code pack) = 
   "Error packet: \n" ++
@@ -141,10 +142,15 @@ instance {-# OVERLAPPABLE #-} Show a => Show (Packet a) where
   showList xs = ((concat . intersperse "===\n" . map show $xs) ++)
   show = showPacket
 
+-- |Convert generic NLAttrs into a string (# and hexdump)
 showNLAttrs :: Attributes -> String
 showNLAttrs = showAttrs show 
 
-showAttrs :: (Int -> String) -> Attributes -> String
+-- |Helper function to convert attributes into a string
+showAttrs 
+  :: (Int -> String) -- ^A function from element id to its name
+  -> Attributes -- ^The attributes
+  -> String -- ^A string with Element name and hexdump of element
 showAttrs sh = showAttrs' . toList
   where
     showAttrs' [] = "\n"
@@ -270,6 +276,7 @@ makeSocketGeneric
   -> IO NetlinkSocket
 makeSocketGeneric = fmap NS . C.makeSocketGeneric
 
+-- |Get the raw 'Fd' used for netlink communcation (this can be plugged into eventing)
 getNetlinkFd :: NetlinkSocket -> Fd
 getNetlinkFd (NS f) = Fd f
 

@@ -59,18 +59,22 @@ instance Convertable a => Convertable (GenlData a) where
 -- |Type declaration for genetlink packets
 type GenlPacket a = Packet (GenlData a)
 
+-- |Show isntance of GenlHeader
 instance Show GenlHeader where
   show (GenlHeader cmd ver) =
     "Header: Cmd = " ++ show cmd ++ ", Version: " ++ show ver ++ "\n"
 
+-- |Show instance of GenlData
 instance {-# OVERLAPPABLE #-} Show a => Show (GenlData a) where
   show (GenlData hdr content) =
     show hdr ++ show content
 
+-- |Show instance of GenlData for NoData
 instance Show (GenlData NoData) where
   show (GenlData hdr _) =
     show hdr
 
+-- |Show Instance for GenlPacket
 instance {-# OVERLAPPABLE #-} Show a => Show (GenlPacket a) where
   showList xs = ((concat . intersperse "===\n" . map show $xs) ++)
   show (Packet _ cus attrs) =
