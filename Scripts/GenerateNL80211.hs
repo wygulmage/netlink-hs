@@ -3,12 +3,13 @@ module Main where
 import Control.Arrow ((&&&))
 import Control.Monad (join)
 import Data.List (intersperse, isInfixOf)
-import Data.Map (Map, union, keys)
+import Data.Map (Map, keys)
 import System.Environment (getArgs)
 
 
-import Scripts.Helpers
+import Helpers
 
+main :: IO ()
 main = do
     [out] <- getArgs
     let inc = mkIncludeBlock includeFiles
@@ -25,7 +26,7 @@ main = do
     writeFile out $ unlines (prelude ++ join definitions)
 
 outputs :: Map String Integer -> [Map String Integer] -> ([[String]], [[String]])
-outputs d e = let define r = selectDefines r d
+outputs _ e = let {-define r = selectDefines r d-}
                   enum r = selectEnum r e
               in map fst &&& map snd $
        [ mkEnum "NL80211Commands" $ enum "^NL80211_CMD_"
@@ -35,7 +36,7 @@ outputs d e = let define r = selectDefines r d
 
   where bssenum = head . noChanWidth . noBssStatus
         noChanWidth = filter (all (not . isInfixOf "CHAN_WIDTH_") . keys)
-	noBssStatus = filter (all (not . isInfixOf "BSS_STATUS_") . keys)
+        noBssStatus = filter (all (not . isInfixOf "BSS_STATUS_") . keys)
 
 includeFiles :: [String]
 includeFiles = [ "linux/nl80211.h" ]

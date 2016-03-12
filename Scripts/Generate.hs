@@ -6,8 +6,9 @@ import Data.List (intersperse)
 import Data.Map (Map, union)
 import System.Environment (getArgs)
 
-import Scripts.Helpers
+import Helpers
 
+main :: IO ()
 main = do
     [out] <- getArgs
     let inc = mkIncludeBlock includeFiles

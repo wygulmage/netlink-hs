@@ -3,11 +3,12 @@ module Main where
 import Control.Arrow ((&&&))
 import Control.Monad (join)
 import Data.List (intersperse)
-import Data.Map (Map, union)
+import Data.Map (Map)
 import System.Environment (getArgs)
 
-import Scripts.Helpers
+import Helpers
 
+main :: IO ()
 main = do
     [out] <- getArgs
     let inc = mkIncludeBlock includeFiles
@@ -24,7 +25,7 @@ main = do
     writeFile out $ unlines (prelude ++ join definitions)
 
 outputs :: Map String Integer -> [Map String Integer] -> ([[String]], [[String]])
-outputs d e = let define r = selectDefines r d
+outputs _ e = let {-define r = selectDefines r d-}
                   enum r = selectEnum r e
               in map fst &&& map snd $
     [mkEnum "ControlCommand" $ enum "^CTRL_CMD_[^_]+",

@@ -1,27 +1,35 @@
-module Scripts.Helpers
-(mkIncludeBlock, getDefinitions, getEnums, selectDefines, selectEnum, mkEnum,
-mkFlag, selectEnums)
+module Helpers
+  ( mkIncludeBlock
+  , getDefinitions
+  , getEnums
+  , selectDefines
+  , selectEnum
+  , mkEnum
+  , mkFlag
+  , selectEnums
+  )
 where
 
-import Control.Applicative ((<$>))
+--import Control.Applicative ((<$>))
+
 import Control.Monad (join)
-import Data.Char (isNumber, toLower, toUpper)
+import Data.Char (isNumber)
 import Data.Function (on)
-import Data.List (isPrefixOf, isInfixOf, notElem, sortBy, nubBy)
+import Data.List (isPrefixOf, sortBy, nubBy)
 import Data.Map (Map, elems, filterWithKey, fromList, insert,
                  keys, mapKeys, toList, lookup, empty)
-import Data.Maybe (mapMaybe, catMaybes, fromJust)
+import Data.Maybe (mapMaybe, fromJust)
 import Language.C.Analysis (runTrav_)
 import Language.C.Analysis.AstAnalysis (analyseAST)
 import Language.C.Analysis.SemRep (GlobalDecls(..), TagDef(EnumDef),
                                    EnumType(..), Enumerator(..))
 import Language.C.Data.Ident (Ident(..))
 import Language.C.Data.InputStream (inputStreamFromString)
-import Language.C.Data.Position (Position(..), position)
+import Language.C.Data.Position (position)
 import Language.C.Parser (parseC)
 import Language.C.Pretty (pretty)
 import Language.C.Syntax.Constants (getCInteger)
-import Language.C.Syntax.AST (CExpression(..), CExpr(..), CConstant(CIntConst), CBinaryOp(..))
+import Language.C.Syntax.AST (CExpression(..), CExpr, CConstant(CIntConst), CBinaryOp(..))
 import System.Process (readProcess)
 import Text.Regex.PCRE ((=~))
 
@@ -64,7 +72,7 @@ showEnum name vals = (fName,
     fName = "show" ++ name
 
 selectDefines :: String -> Map String Integer -> Map String Integer
-selectDefines regex = filterWithKey (\k v -> k =~ regex)
+selectDefines regex = filterWithKey (\k _ -> k =~ regex)
 
 selectEnum :: String -> [Map String Integer] -> Map String Integer
 selectEnum regex = head . selectEnums regex
@@ -72,8 +80,8 @@ selectEnum regex = head . selectEnums regex
 selectEnums :: String -> [Map String Integer] -> [Map String Integer]
 selectEnums regex = filter (all (=~ regex) . keys)
 
-full :: String -> String
-full regex = "^" ++ regex ++ "$"
+--full :: String -> String
+--full regex = "^" ++ regex ++ "$"
 
 getEnums :: String -> IO [Map String Integer]
 getEnums source = do
@@ -106,12 +114,12 @@ evalEExpr m (CVar (Ident a _ _) _)   = fromJust $lookup a m
 evalEExpr _ other                    = error $ "Other: " ++ show (pretty other)
 
 
-evalCExpr :: CExpr -> Integer
-evalCExpr = evalEExpr empty
+--evalCExpr :: CExpr -> Integer
+--evalCExpr = evalEExpr empty
 
 
 sanitize :: [[String]] -> [[String]]
-sanitize (["@define",n]:x:[y]:xs) = ["@define",n,y]:sanitize xs
+sanitize (["@define",n]:_:[y]:xs) = ["@define",n,y]:sanitize xs
 sanitize (["@define",x,y]:xs) = ["@define",x,y]:sanitize xs
 sanitize (_:xs) = sanitize xs
 sanitize [] = []
@@ -120,6 +128,7 @@ getDefinitions :: String -> IO (Map String Integer)
 getDefinitions headers = do
     defines <- map words . lines <$> readDefines headers
     let isDefine (c:n:_) = c == "#define" && '(' `notElem` n && head n /= '_' 
+        isDefine xs = error ("isDefine: Couldn't check: " ++ show xs)
         hasValue = (>= 3) . length
         names = map (!! 1) $ filter (\d -> isDefine d && hasValue d) defines
         kludge = map (\n -> "@define \"" ++ n ++ "\" " ++ n) names
@@ -131,6 +140,7 @@ getDefinitions headers = do
                             all isNumber (drop 2 (d !! 2)))
         realDefines = map (take 2 . drop 1) $ filter isInteresting $ sanitize defines2
         clean [k,v] = (init (tail k), read v)
+        clean _ = error "Clean: got a weird list"
     return $ fromList (map clean realDefines)
   where readDefines = readProcess "gcc" ["-E", "-dM", "-"]
         preprocess  = readProcess "gcc" ["-E", "-"]
