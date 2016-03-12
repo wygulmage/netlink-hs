@@ -90,7 +90,8 @@ instance Show RoutePacket where
   show (Packet hdr cus attrs) =
     "RoutePacket: " ++ show hdr ++ "\n" ++
     show cus ++ "\n" ++
-    "Attrs: \n" ++ showNLAttrs attrs
+    --TODO: is this the case every time? maybe match on other to get which enum to use
+    "Attrs: \n" ++ showAttrs showLinkAttrType attrs
   show (ErrorMsg hdr code packet) = 
     "Error packet: \n" ++
     show hdr ++ "\n" ++

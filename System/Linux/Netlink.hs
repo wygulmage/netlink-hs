@@ -38,6 +38,7 @@ module System.Linux.Netlink
   , queryOne
   , recvOne
   , showNLAttrs
+  , showAttrs
 )
 where
 
@@ -137,9 +138,15 @@ instance {-# OVERLAPPABLE #-} Show a => Show (Packet a) where
     "Attrs: \n" ++ showNLAttrs attrs
 
 showNLAttrs :: Attributes -> String
-showNLAttrs = showAttrs . toList
-  where showAttrs [] = "\n"
-        showAttrs ((i,v):xs) = show i ++ ": " ++ prettyHex v ++ showAttrs xs
+showNLAttrs = showAttrs show 
+
+showAttrs :: (Int -> String) -> Attributes -> String
+showAttrs sh = showAttrs' . toList
+  where
+    showAttrs' [] = "\n"
+    showAttrs' ((i,v):xs) = 
+      sh i ++ ": " ++ prettyHex v ++ showAttrs' xs
+
 
 -- | Read packets from the buffer
 getPacket 
