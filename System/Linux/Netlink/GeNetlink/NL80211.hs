@@ -72,16 +72,11 @@ type NL80211Packet = GenlPacket NoData80211
 
 instance Show NL80211Packet where
   showList xs = ((concat . intersperse "===\n" . map show $xs) ++)
-  show (DoneMsg hdr) = "Done: " ++ show hdr
-  show (ErrorMsg hdr code packet) = 
-    "Error packet: \n" ++
-    show hdr ++ "\n" ++
-    "Error code: " ++ (show code) ++ "\n" ++
-    (show packet)
   show (Packet _ cus attrs) =
     "NL80211Packet: " ++ showNL80211Command cus ++ "\n" ++
     --TODO: is this the case every time? maybe match on other to get which enum to use
     "Attrs: \n" ++ showAttrs showNL80211Attrs attrs
+  show p = showPacket p
 
 showNL80211Command :: (GenlData NoData80211) -> String
 showNL80211Command (GenlData (GenlHeader cmd _) _ ) =

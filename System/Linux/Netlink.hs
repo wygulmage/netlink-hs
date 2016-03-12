@@ -39,6 +39,7 @@ module System.Linux.Netlink
   , recvOne
   , showNLAttrs
   , showAttrs
+  , showPacket
 )
 where
 
@@ -124,18 +125,21 @@ data Packet a
     }
     deriving (Eq)
 
+showPacket :: Show a => Packet a -> String
+showPacket (ErrorMsg hdr code pack) = 
+  "Error packet: \n" ++
+  show hdr ++ "\n" ++
+  "Error code: " ++ (show code) ++ "\n" ++
+  (show pack)
+showPacket (DoneMsg hdr) = "Done: " ++ show hdr
+showPacket (Packet hdr cus attrs) =
+  "NetlinkPacket: " ++ show hdr ++ "\n" ++
+  "Custom data: " ++ show cus ++ "\n" ++
+  "Attrs: \n" ++ showNLAttrs attrs
+
 instance {-# OVERLAPPABLE #-} Show a => Show (Packet a) where
   showList xs = ((concat . intersperse "===\n" . map show $xs) ++)
-  show (ErrorMsg hdr code pack) = 
-    "Error packet: \n" ++
-    show hdr ++ "\n" ++
-    "Error code: " ++ (show code) ++ "\n" ++
-    (show pack)
-  show (DoneMsg hdr) = "Done: " ++ show hdr
-  show (Packet hdr cus attrs) =
-    "NetlinkPacket: " ++ show hdr ++ "\n" ++
-    "Custom data: " ++ show cus ++ "\n" ++
-    "Attrs: \n" ++ showNLAttrs attrs
+  show = showPacket
 
 showNLAttrs :: Attributes -> String
 showNLAttrs = showAttrs show 

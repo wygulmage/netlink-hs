@@ -86,18 +86,12 @@ type RoutePacket = Packet Message
 
 instance Show RoutePacket where
   showList xs = ((concat . intersperse "===\n" . map show $xs) ++)
-  show (DoneMsg hdr) = "Done: " ++ show hdr
   show (Packet hdr cus attrs) =
     "RoutePacket: " ++ show hdr ++ "\n" ++
     show cus ++ "\n" ++
     --TODO: is this the case every time? maybe match on other to get which enum to use
     "Attrs: \n" ++ showAttrs showLinkAttrType attrs
-  show (ErrorMsg hdr code packet) = 
-    "Error packet: \n" ++
-    show hdr ++ "\n" ++
-    "Error code: " ++ (show code) ++ "\n" ++
-    (show packet)
-
+  show p = showPacket p
 
 --TODO maybe this should be changed
 --

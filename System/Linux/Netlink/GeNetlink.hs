@@ -73,15 +73,10 @@ instance Show (GenlData NoData) where
 
 instance {-# OVERLAPPABLE #-} Show a => Show (GenlPacket a) where
   showList xs = ((concat . intersperse "===\n" . map show $xs) ++)
-  show (ErrorMsg hdr code pack) = 
-    "Error packet: \n" ++
-    show hdr ++ "\n" ++
-    "Error code: " ++ (show code) ++ "\n" ++
-    (show pack)
-  show (DoneMsg hdr) = "Done: " ++ show hdr
   show (Packet _ cus attrs) =
     "GenlPacket: " ++ show cus ++ "\n" ++
     "Attrs: \n" ++ showNLAttrs attrs
+  show p = showPacket p
 
 -- |'Get' function for 'GenlHeader'
 getGenlHeader :: Get GenlHeader
