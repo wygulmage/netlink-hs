@@ -7,7 +7,7 @@ import Control.Applicative ((<$>))
 import Control.Monad (join)
 import Data.Char (isNumber, toLower, toUpper)
 import Data.Function (on)
-import Data.List (isPrefixOf, isInfixOf, notElem, sortBy)
+import Data.List (isPrefixOf, isInfixOf, notElem, sortBy, nubBy)
 import Data.Map (Map, elems, filterWithKey, fromList, insert,
                  keys, mapKeys, toList, lookup, empty)
 import Data.Maybe (mapMaybe, catMaybes, fromJust)
@@ -42,8 +42,8 @@ mkFlag name vals = (name : map fst values,
     values = sortBy (compare `on` snd) . toList . mapKeys ("f" ++) $ vals
 
 mkEnum :: String -> Map String Integer -> ([String], [String])
-mkEnum name vals = (name : map fst values,
-                    ty : "" : join (map makeConst values))
+mkEnum name vals = (name : fName : map fst values,
+                    ty : "" : fun : "" : join (map makeConst values))
   where
     ty = "newtype " ++ name ++ " = " ++
           name ++
@@ -51,6 +51,17 @@ mkEnum name vals = (name : map fst values,
     makeConst (n, v) = [n ++ " :: (Num a) => a",
                         n ++ " = " ++ show v]
     values = sortBy (compare `on` snd) . toList . mapKeys ('e' :) $ vals
+    (fName, fun) = showEnum name vals
+
+showEnum :: String -> Map String Integer -> (String, String)
+showEnum name vals = (fName,
+  fName ++ " :: (Num a) => (Show a) => (Eq a) => a -> String\n" ++
+  concatMap makeLine values ++
+  fName ++ " i = \"" ++ name ++ " #\" ++ (show i)\n")
+  where
+    makeLine (n, v) = fName ++ ' ':(show v) ++ " = \"" ++ n ++ "\"\n"
+    values = nubBy ((==) `on` snd) . sortBy (compare `on` snd) . toList $vals
+    fName = "show" ++ name
 
 selectDefines :: String -> Map String Integer -> Map String Integer
 selectDefines regex = filterWithKey (\k v -> k =~ regex)
