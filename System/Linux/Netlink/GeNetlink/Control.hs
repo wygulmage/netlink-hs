@@ -25,6 +25,7 @@ module System.Linux.Netlink.GeNetlink.Control
   , getFamilyWithMulticasts
   , getMulticastGroups
   , getMulticast
+  , getFamilies
   )
 where
 
@@ -33,6 +34,7 @@ where
 import Control.Applicative ((<$>))
 #endif
 
+import Data.Bits ((.|.))
 import Data.Serialize.Get
 import Data.Serialize.Put
 import Data.Map (fromList, lookup, toList, Map)
@@ -199,6 +201,15 @@ getFamilyWithMulticasts sock name = do
   where getIdFromList (CTRL_ATTR_FAMILY_ID x:_) = x
         getIdFromList (_:xs) = getIdFromList xs
         getIdFromList [] = -1
+
+getFamilies :: NetlinkSocket -> IO [CtrlPacket]
+getFamilies sock = do
+  map ctrlPacketFromGenl <$> query sock familiesRequest
+  where familiesRequest = let header = Header 16 (fNLM_F_REQUEST .|. fNLM_F_ROOT .|. fNLM_F_MATCH) 33 0
+                              geheader = GenlHeader eCTRL_CMD_GETFAMILY 0
+                              attrs = fromList [] in
+                            Packet header (GenlData geheader NoData) attrs
+
 
 -- |get the mutlicast groups of a netlink family by id
 getMulticastGroups :: NetlinkSocket -> Word16 -> IO [CtrlAttrMcastGroup]
