@@ -45,7 +45,7 @@ import Data.Serialize.Put (runPut, putWord32host)
 import Data.Word (Word32, Word16, Word8)
 
 import Data.ByteString (ByteString)
-import qualified Data.Map as M (empty, lookup, fromList, member)
+import qualified Data.Map as M (empty, lookup, fromList, member, toList)
 
 import System.Posix.Types (Fd)
 
@@ -75,13 +75,22 @@ instance Show NL80211Packet where
   showList xs = ((intercalate "===\n" . map show $xs) ++)
   show (Packet _ cus attrs) =
     "NL80211Packet: " ++ showNL80211Command cus ++ "\n" ++
-    "Attrs: \n" ++ showAttrs showNL80211Attrs attrs
+    "Attrs: \n" ++ concatMap showNL80211Attr (M.toList attrs) ++ "\n"
   show p = showPacket p
 
 showNL80211Command :: (GenlData NoData80211) -> String
 showNL80211Command (GenlData (GenlHeader cmd _) _ ) =
   showNL80211Commands cmd
 
+showNL80211Attr :: (Int, ByteString) -> String
+showNL80211Attr (i, v)
+  | i == eNL80211_ATTR_STA_INFO = showStaInfo v
+  | otherwise = showAttr showNL80211Attrs (i, v)
+
+
+showStaInfo :: ByteString -> String
+showStaInfo bs = let attrs = getRight $ runGet getAttributes bs in
+  showAttrs showNl80211StaInfo attrs
 
 -- |Get the raw fd from a 'NL80211Socket'. This can be used for eventing
 getFd :: NL80211Socket -> Fd

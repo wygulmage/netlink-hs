@@ -32,6 +32,7 @@ outputs _ e = let {-define r = selectDefines r d-}
        [ mkEnum "NL80211Commands" $ enum "^NL80211_CMD_"
        , mkEnum "NL80211Attrs" $ enum "^NL80211_ATTR_([^C]|(C[^Q])|(CQ[^M])|(CQM$))|NUM_NL80211_ATTR$"
        , mkEnum "NL80211Bss" . bssenum $selectEnums "^NL80211_BSS_" e
+       , mkEnum "Nl80211StaInfo" $ enum "^NL80211_STA_INFO_"
        , mkEnum "IEEE80211EID" $ enum "^WLAN_EID_"
        ]
 

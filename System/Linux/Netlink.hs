@@ -39,6 +39,7 @@ module System.Linux.Netlink
   , recvOne
   , showNLAttrs
   , showAttrs
+  , showAttr
   , showPacket
 )
 where
@@ -154,9 +155,10 @@ showAttrs
 showAttrs sh = showAttrs' . toList
   where
     showAttrs' [] = "\n"
-    showAttrs' ((i,v):xs) = 
-      sh i ++ ": " ++ prettyHex v ++ showAttrs' xs
+    showAttrs' (x:xs) = showAttr sh x ++ showAttrs' xs
 
+showAttr :: (Int -> String) -> (Int, ByteString) -> String
+showAttr sh (i,v) = sh i ++ ": " ++ prettyHex v
 
 -- | Read packets from the buffer
 getPacket 
