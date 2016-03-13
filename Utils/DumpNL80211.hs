@@ -7,7 +7,7 @@ import System.Linux.Netlink.GeNetlink.NL80211
 
 loopPrint :: NL80211Socket -> IO ()
 loopPrint sock = do
-  pack <- getPaket sock
+  pack <- getPacket sock
   putStrLn $show pack
   loopPrint sock
 

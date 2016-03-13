@@ -24,7 +24,7 @@ module System.Linux.Netlink.GeNetlink.NL80211
   , getScanResults
   , getConnectedWifi
   , getWifiAttributes
-  , getPaket
+  , getPacket
   , getFd
   , getMulticastGroups
   )
@@ -35,17 +35,16 @@ where
 import Control.Applicative ((<$>))
 #endif
 
-import Control.Monad (liftM, liftM2, join)
 import Control.Monad.Loops (whileM)
 import Data.Bits ((.|.))
 import Data.ByteString.Char8 (unpack)
-import Data.List (intersperse)
+import Data.List (intercalate)
 import Data.Maybe (mapMaybe)
 import Data.Serialize.Get (runGet, getByteString, getWord8 ,getWord32host, isEmpty, Get)
 import Data.Serialize.Put (runPut, putWord32host)
 import Data.Word (Word32, Word16, Word8)
 
-import qualified Data.ByteString as BS
+import Data.ByteString (ByteString)
 import qualified Data.Map as M (empty, lookup, fromList, member)
 
 import System.Posix.Types (Fd)
@@ -55,7 +54,7 @@ import System.Linux.Netlink.GeNetlink
 import System.Linux.Netlink.GeNetlink.Control hiding (getMulticastGroups)
 import qualified System.Linux.Netlink.GeNetlink.Control as C
 import System.Linux.Netlink.GeNetlink.NL80211.Constants
-import System.Linux.Netlink hiding (makeSocket, queryOne, query, recvOne)
+import System.Linux.Netlink hiding (makeSocket, queryOne, query, recvOne, getPacket)
 import qualified System.Linux.Netlink as I (queryOne, query, recvOne)
 
 -- The Netlink socket with Family Id, so we don't need as many arguments
@@ -73,10 +72,9 @@ instance Convertable NoData80211 where
 type NL80211Packet = GenlPacket NoData80211
 
 instance Show NL80211Packet where
-  showList xs = ((concat . intersperse "===\n" . map show $xs) ++)
+  showList xs = ((intercalate "===\n" . map show $xs) ++)
   show (Packet _ cus attrs) =
     "NL80211Packet: " ++ showNL80211Command cus ++ "\n" ++
-    --TODO: is this the case every time? maybe match on other to get which enum to use
     "Attrs: \n" ++ showAttrs showNL80211Attrs attrs
   show p = showPacket p
 
@@ -84,8 +82,6 @@ showNL80211Command :: (GenlData NoData80211) -> String
 showNL80211Command (GenlData (GenlHeader cmd _) _ ) =
   showNL80211Commands cmd
 
--- |typedef for lazyness
-type ByteString = BS.ByteString --the name would just annoy me
 
 -- |Get the raw fd from a 'NL80211Socket'. This can be used for eventing
 getFd :: NL80211Socket -> Fd
@@ -125,9 +121,11 @@ joinMulticastByName (NLS sock _) name = do
     Nothing -> error $"Could not find \"" ++ name  ++ "\" multicast group"
     Just x -> joinMulticastGroup sock x
 
+
 getMulticastGroups :: NL80211Socket -> IO [String]
 getMulticastGroups (NLS sock fid) =
   map grpName <$> C.getMulticastGroups sock fid
+
 
 getRequestPacket :: Word16 -> Word8 -> Bool -> Attributes -> NL80211Packet
 getRequestPacket fid cmd dump attrs =
@@ -158,12 +156,15 @@ parseInterface (name, ifindex) =
 getInterfaceList :: NL80211Socket -> IO [(String, Word32)]
 getInterfaceList sock = do
   interfaces <- query sock eNL80211_CMD_GET_INTERFACE True M.empty
-  return $mapMaybe (liftM parseInterface . toTuple) interfaces
-  where toTuple (Packet _ _ attrs) = liftM2 (,) (name attrs) (findex attrs)
-        toTuple (ErrorMsg{}) = error "Something stupid happened"
+  return $ mapMaybe (fmap parseInterface . toTuple) interfaces
+  where toTuple :: NL80211Packet -> Maybe (ByteString, ByteString)
+        toTuple (Packet _ _ attrs) = do
+          name <- M.lookup eNL80211_ATTR_IFNAME attrs
+          findex <- M.lookup eNL80211_ATTR_IFINDEX attrs
+          return (name, findex)
+        toTuple x@(ErrorMsg{}) =
+          error ("Something happend while getting the interfaceList: " ++ show x)
         toTuple (DoneMsg _) = Nothing
-        name = M.lookup eNL80211_ATTR_IFNAME
-        findex = M.lookup eNL80211_ATTR_IFINDEX
 
 
 {- |get scan results
@@ -211,12 +212,12 @@ getConnectedWifi sock ifindex = filter isConn <$> getScanResults sock ifindex
 getWifiAttributes :: NL80211Packet -> Maybe Attributes
 getWifiAttributes (Packet _ _ attrs) =
   getRight <$> runGet getWifiEIDs <$> eids
-  where bssattrs = getRight <$> runGet getAttributes <$> M.lookup eNL80211_ATTR_BSS attrs
-        eids = join $liftM (M.lookup eNL80211_BSS_INFORMATION_ELEMENTS) bssattrs
+  where bssattrs = getRight . runGet getAttributes <$> M.lookup eNL80211_ATTR_BSS attrs
+        eids = M.lookup eNL80211_BSS_INFORMATION_ELEMENTS =<< bssattrs
 getWifiAttributes x@(ErrorMsg{}) = error ("Something stupid happened" ++ show x)
 getWifiAttributes (DoneMsg _) = Nothing
 
 
 -- |NL80211 version of 'System.Linux.Netlink.recvOne'
-getPaket :: NL80211Socket -> IO [NL80211Packet]
-getPaket (NLS sock _) = I.recvOne sock
+getPacket :: NL80211Socket -> IO [NL80211Packet]
+getPacket (NLS sock _) = I.recvOne sock
