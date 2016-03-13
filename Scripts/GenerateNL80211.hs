@@ -12,7 +12,7 @@ import Helpers
 main :: IO ()
 main = do
     [out] <- getArgs
-    let inc = mkIncludeBlock includeFiles
+    let inc = mkIncludeBlock includeFiles ++ "#include \"headers/ieee80211.h\"\n"
     defines <- getDefinitions inc
     enums <- getEnums inc
     let (exports, definitions) = outputs defines enums
@@ -32,6 +32,7 @@ outputs _ e = let {-define r = selectDefines r d-}
        [ mkEnum "NL80211Commands" $ enum "^NL80211_CMD_"
        , mkEnum "NL80211Attrs" $ enum "^NL80211_ATTR_([^C]|(C[^Q])|(CQ[^M])|(CQM$))|NUM_NL80211_ATTR$"
        , mkEnum "NL80211Bss" . bssenum $selectEnums "^NL80211_BSS_" e
+       , mkEnum "IEEE80211EID" $ enum "^WLAN_EID_"
        ]
 
   where bssenum = getFirst . noChanWidth . noBssStatus
