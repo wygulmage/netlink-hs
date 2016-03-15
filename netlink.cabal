@@ -85,6 +85,7 @@ Library
   Exposed-modules:   System.Linux.Netlink
                      System.Linux.Netlink.Constants
                      System.Linux.Netlink.Route
+                     System.Linux.Netlink.Route.LinkStat
                      System.Linux.Netlink.Helpers
                      System.Linux.Netlink.GeNetlink
                      System.Linux.Netlink.GeNetlink.Constants

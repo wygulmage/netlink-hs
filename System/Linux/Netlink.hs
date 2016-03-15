@@ -154,7 +154,7 @@ showAttrs
   -> String -- ^A string with Element name and hexdump of element
 showAttrs sh = showAttrs' . toList
   where
-    showAttrs' [] = "\n"
+    showAttrs' [] = []
     showAttrs' (x:xs) = showAttr sh x ++ showAttrs' xs
 
 showAttr :: (Int -> String) -> (Int, ByteString) -> String

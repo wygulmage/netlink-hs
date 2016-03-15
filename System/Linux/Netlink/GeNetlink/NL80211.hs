@@ -45,10 +45,12 @@ import Data.Serialize.Put (runPut, putWord32host)
 import Data.Word (Word32, Word16, Word8)
 
 import Data.ByteString (ByteString)
+import qualified Data.ByteString as BS (length)
 import qualified Data.Map as M (empty, lookup, fromList, member, toList)
 
 import System.Posix.Types (Fd)
 
+import System.Linux.Netlink.Helpers (indent)
 import System.Linux.Netlink.Constants
 import System.Linux.Netlink.GeNetlink
 import System.Linux.Netlink.GeNetlink.Control hiding (getMulticastGroups)
@@ -85,12 +87,30 @@ showNL80211Command (GenlData (GenlHeader cmd _) _ ) =
 showNL80211Attr :: (Int, ByteString) -> String
 showNL80211Attr (i, v)
   | i == eNL80211_ATTR_STA_INFO = showStaInfo v
+  | i == eNL80211_ATTR_RESP_IE = showWifiEid v
+  | i == eNL80211_ATTR_BSS = showAttrBss v
   | otherwise = showAttr showNL80211Attrs (i, v)
-
 
 showStaInfo :: ByteString -> String
 showStaInfo bs = let attrs = getRight $ runGet getAttributes bs in
-  showAttrs showNl80211StaInfo attrs
+  "NL80211_ATTR_STA_INFO: " ++ show (BS.length bs) ++ "\n" ++
+  (indent $showAttrs showNl80211StaInfo attrs)
+
+showWifiEid :: ByteString -> String
+showWifiEid bs = let attrs = getRight $ runGet getWifiEIDs bs in
+  "WifiEIDs:\n" ++
+  (indent $showAttrs showIEEE80211EID attrs)
+
+showAttrBss :: ByteString -> String
+showAttrBss bs = let attrs = getRight $ runGet getAttributes bs in
+  "NL80211_ATTR_BSS: " ++ show (BS.length bs) ++ "\n" ++
+  (indent . concatMap showBssAttr $ M.toList attrs)
+
+showBssAttr :: (Int, ByteString) -> String
+showBssAttr (i, v)
+  | i == eNL80211_BSS_INFORMATION_ELEMENTS = "NL80211_BSS_INFORMATION_ELEMENTS " ++ showWifiEid v
+  | i == eNL80211_BSS_BEACON_IES = "NL80211_BSS_BEACON_IES " ++ showWifiEid v
+  | otherwise = showAttr showNL80211Bss (i, v)
 
 -- |Get the raw fd from a 'NL80211Socket'. This can be used for eventing
 getFd :: NL80211Socket -> Fd

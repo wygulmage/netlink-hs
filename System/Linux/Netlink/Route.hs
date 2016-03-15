@@ -42,10 +42,11 @@ import Prelude hiding (length, lookup, init)
 import Control.Applicative ((<$>))
 #endif
 
+import qualified Data.ByteString as BS (length)
 import Data.ByteString.Char8 (ByteString, append, init, pack, unpack)
 import Data.Char (chr, ord)
 import Data.List (intersperse)
-import Data.Map (insert, lookup)
+import Data.Map (insert, lookup, toList)
 import Data.Serialize.Get
 import Data.Serialize.Put
 import Data.Word (Word8, Word32)
@@ -53,6 +54,7 @@ import Data.Word (Word8, Word32)
 import System.Linux.Netlink.Constants
 import System.Linux.Netlink
 import System.Linux.Netlink.Helpers
+import System.Linux.Netlink.Route.LinkStat
 
 -- |The static data for route messages
 data Message = NLinkMsg
@@ -72,7 +74,7 @@ data Message = NLinkMsg
 
 instance Show Message where
   show (NLinkMsg t i f) =
-    "LinkMessage. Type: " ++ show t ++ ", Index: " ++ show i ++ ", Flags: " ++ show f
+    "LinkMessage. Type: " ++ showLinkType t ++ ", Index: " ++ show i ++ ", Flags: " ++ show f
   show (NAddrMsg f l fl s i) =
     "AddrMessage. Family: " ++ show f ++ ", MLength: " ++ show l ++ ", Flags: " ++ 
     show fl ++ ", Scope: " ++ show s ++ ", Index: " ++ show i
@@ -84,14 +86,51 @@ instance Convertable Message where
 -- |Typedef for route messages
 type RoutePacket = Packet Message
 
+showRouteHeader :: Header -> String
+showRouteHeader (Header t f s p) =
+  "Type: " ++ showMessageType t ++ ", Flags: " ++ (show f) ++ ", Seq: " ++ show s ++ ", Pid: " ++ show p
+
+
 instance Show RoutePacket where
   showList xs = ((concat . intersperse "===\n" . map show $xs) ++)
   show (Packet hdr cus attrs) =
-    "RoutePacket: " ++ show hdr ++ "\n" ++
+    "RoutePacket: " ++ showRouteHeader hdr ++ "\n" ++
     show cus ++ "\n" ++
     --TODO: is this the case every time? maybe match on other to get which enum to use
-    "Attrs: \n" ++ showAttrs showLinkAttrType attrs
+    "Attrs: \n" ++ concatMap showLinkAttr (toList attrs) ++ "\n"
   show p = showPacket p
+
+
+showLinkAttr :: (Int, ByteString) -> String
+showLinkAttr (i, v)
+  | i == eIFLA_STATS64 = "IFLA_STATS64:\n" ++ showStats64 v
+  | i == eIFLA_STATS = "IFLA_STATS:\n" ++ showStats32 v
+  | i == eIFLA_AF_SPEC = 
+    "eIFLA_AF_SPEC: " ++ show (BS.length v) ++ '\n':indent (showAfSpec v)
+  | otherwise = showAttr showLinkAttrType (i, v)
+
+showStats64 :: ByteString -> String
+showStats64 bs = case runGet getLinkStat64 bs of
+  (Left x) -> error ("Could not marshall LinkStat64: " ++ x)
+  (Right x) -> show x ++ "\n"
+
+showStats32 :: ByteString -> String
+showStats32 bs = case runGet getLinkStat32 bs of
+  (Left x) -> error ("Could not marshall LinkStat32: " ++ x)
+  (Right x) -> show x ++ "\n"
+
+
+showAfSpec :: ByteString -> String
+showAfSpec bs = case runGet getAttributes bs of
+  (Left x) -> error ("Could not marshall AfSpec: " ++ x)
+  (Right attrs) -> 
+    concatMap (\(i, v) -> showAddressFamily i ++ '\n': indent (showAfSpec' v)) (toList attrs)
+
+showAfSpec' :: ByteString -> String
+showAfSpec' bs = case runGet getAttributes bs of
+  (Left x) -> error ("Could not marshall AfSpec': " ++ x)
+  (Right attrs) -> showNLAttrs attrs
+
 
 --TODO maybe this should be changed
 --

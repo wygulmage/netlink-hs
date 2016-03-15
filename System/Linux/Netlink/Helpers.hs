@@ -14,6 +14,9 @@ import Data.Serialize.Put
 
 import Data.Word
 
+-- |Indent a String by 2 " "s for output
+indent :: String -> String
+indent = unlines . map ("  " ++) . lines
 
 --
 -- Helpers
@@ -27,6 +30,9 @@ p16 = putWord16host
 -- | 'Put' 'Word32'
 p32 :: Word32 -> Put
 p32 = putWord32host
+-- | 'Put' 'Word64'
+p64 :: Word64 -> Put
+p64 = putWord64host
 
 -- | 'Get' 'Word8'
 g8 :: Get Word8
@@ -37,5 +43,6 @@ g16 = getWord16host
 -- | 'Get' 'Word32'
 g32 :: Get Word32
 g32 = getWord32host
-
-
+-- | 'Get' 'Word64'
+g64 :: Get Word64
+g64 = getWord64host
