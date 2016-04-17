@@ -364,4 +364,4 @@ isFlagSet :: Bits a => a -> a -> Bool
 isFlagSet f v = (f .&. v) == f
 
 bufferSize :: Num a => a
-bufferSize = 8192
+bufferSize = 4096

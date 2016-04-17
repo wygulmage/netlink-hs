@@ -10,8 +10,7 @@ I consider this module internal.
 The documentation may be a bit sparse.
 -}
 module System.Linux.Netlink.C
-    (
-      makeSocket
+    ( makeSocket
     , makeSocketGeneric
     , closeSocket
     , sendmsg
@@ -34,7 +33,6 @@ import Foreign.C.Error (throwErrnoIf, throwErrnoIfMinus1, throwErrnoIfMinus1_)
 import Foreign.C.Types
 import Foreign.ForeignPtr (touchForeignPtr)
 import Foreign.ForeignPtr.Unsafe (unsafeForeignPtrToPtr)
-import Foreign.Marshal.Alloc
 import Foreign.Marshal.Array (withArrayLen)
 import Foreign.Marshal.Utils (with)
 import Foreign.Ptr (Ptr, castPtr, plusPtr)
@@ -116,6 +114,7 @@ makeSocketGeneric
 makeSocketGeneric prot = do
   fd <- throwErrnoIfMinus1 "makeSocket.socket" $
           c_socket eAF_NETLINK #{const SOCK_RAW} (fromIntegral prot)
+  -- we need to bind or joining multicast groups will be useless
   with (SockAddrNetlink 0) $ \addr ->
     throwErrnoIfMinus1_ "makeSocket.bind" $
       c_bind fd (castPtr addr) #{size struct sockaddr_nl}
@@ -165,8 +164,7 @@ void act = act >> return ()
 -- |Join a netlink multicast group
 joinMulticastGroup :: CInt -> Word32 -> IO ()
 joinMulticastGroup fd fid = do
-  _ <- throwErrnoIfMinus1 "joinMulticast" $alloca ( \ptr -> do
-    poke ptr fid
+  _ <- throwErrnoIfMinus1 "joinMulticast" $ with fid (\ptr ->
     c_setsockopt fd sol_netlink 1 (castPtr ptr) size)
   return ()
   where size = fromIntegral $sizeOf (undefined :: CInt)
