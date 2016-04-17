@@ -132,7 +132,6 @@ showAfSpec' bs = case runGet getAttributes bs of
   (Right attrs) -> showNLAttrs attrs
 
 
---TODO maybe this should be changed
 --
 -- New generic stuffs
 --

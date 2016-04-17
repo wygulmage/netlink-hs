@@ -48,16 +48,18 @@ import System.Linux.Netlink.Constants (eAF_NETLINK)
 #include <sys/socket.h>
 #include <linux/netlink.h>
 
--- TODO should these be safe or unsafe?
--- FFI declarations for syscalls
-foreign import ccall "socket" c_socket :: CInt -> CInt -> CInt -> IO CInt
-foreign import ccall "bind" c_bind :: CInt -> Ptr SockAddrNetlink -> Int -> IO CInt
+-- FFI declarations for clib syscall wrappers
+-- So if we are not blocking long or calling back into haskell it should be ok to do unsafe imports?
+-- These should be done fast, and we know the will never call back into haskell
+foreign import ccall unsafe "socket" c_socket :: CInt -> CInt -> CInt -> IO CInt
+foreign import ccall unsafe "bind" c_bind :: CInt -> Ptr SockAddrNetlink -> Int -> IO CInt
+foreign import ccall unsafe "close" c_close :: CInt -> IO CInt
+foreign import ccall unsafe "setsockopt" c_setsockopt :: CInt -> CInt -> CInt -> Ptr a -> CInt -> IO CInt
+foreign import ccall unsafe "memset" c_memset :: Ptr a -> CInt -> CInt -> IO ()
+
+-- those two may block for a while, so we'll not do unsafe for them
 foreign import ccall "sendmsg" c_sendmsg :: CInt -> Ptr MsgHdr -> CInt -> IO CInt
 foreign import ccall "recvmsg" c_recvmsg :: CInt -> Ptr MsgHdr -> CInt -> IO CInt
-foreign import ccall "close" c_close :: CInt -> IO CInt
-foreign import ccall "setsockopt" c_setsockopt :: CInt -> CInt -> CInt -> Ptr a -> CInt -> IO CInt
-
-foreign import ccall "memset" c_memset :: Ptr a -> CInt -> CInt -> IO ()
 
 data SockAddrNetlink = SockAddrNetlink Word32
 

@@ -49,10 +49,11 @@ import Data.Maybe (fromMaybe, mapMaybe)
 
 import Prelude hiding (lookup)
 
+import System.Linux.Netlink
+import System.Linux.Netlink.Constants
 import System.Linux.Netlink.GeNetlink
 import System.Linux.Netlink.GeNetlink.Constants
-import System.Linux.Netlink.Constants
-import System.Linux.Netlink
+import System.Linux.Netlink.Helpers (g32, g16)
 
 -- |Datatype for multicast groups as returned by the control protocol
 data CtrlAttrMcastGroup = CAMG {grpName :: String, grpId :: Word32 } deriving (Eq, Show)
@@ -91,17 +92,15 @@ instance Show CtrlPacket where
 -- |typedef for control messages
 type CTRLPacket = GenlPacket NoData
 
--- TODO fix error handling for nested arguments
-
 --
 -- Start ctrl utility
 --
 
 getW16 :: ByteString -> Maybe Word16
-getW16 x = e2M (runGet getWord16host x)
+getW16 x = e2M (runGet g16 x)
 
 getW32 :: ByteString -> Maybe Word32
-getW32 x = e2M (runGet getWord32host x)
+getW32 x = e2M (runGet g32 x)
 
 e2M :: Either a b -> Maybe b
 e2M (Right x) = Just x
@@ -117,7 +116,7 @@ getMcastGroupAttr (_, x) = do
 
 getMcastGroupAttrs :: ByteString -> Maybe [CtrlAttrMcastGroup]
 getMcastGroupAttrs x = case runGet getAttributes x of
-  (Right y) -> sequence $map getMcastGroupAttr $toList y
+  (Right y) -> mapM getMcastGroupAttr $ toList y
   _ -> Nothing
 
 getOpAttr :: (Int, ByteString) -> Maybe CtrlAttrOpData
@@ -129,7 +128,7 @@ getOpAttr (_, x) = do
 
 getOpAttrs :: ByteString -> Maybe [CtrlAttrOpData]
 getOpAttrs x = case runGet getAttributes x of
-  (Right y) -> sequence . map getOpAttr $ toList y
+  (Right y) -> mapM getOpAttr $ toList y
   _ -> Nothing
 
 getAttribute :: (Int, ByteString) -> CtrlAttribute
@@ -189,13 +188,15 @@ ctrlPackettoGenl (CtrlPacket h g attrs)= Packet h (GenlData g NoData) a
   where a = fromList $map ctrlAttributesToAttribute attrs
 
 
---TODO maybe set request id more sensible?
+-- Hardcoding the request ID is not the most elegant, but shouldn't be a problem
+-- since the family should be obvious in the answer
 familyMcastRequest :: Word16 -> CTRLPacket
 familyMcastRequest fid = let
   header = Header 16 fNLM_F_REQUEST 42 0
   geheader = GenlHeader eCTRL_CMD_GETFAMILY 0
   attrs = fromList [(eCTRL_ATTR_FAMILY_ID, runPut $putWord16host fid)] in
     Packet header (GenlData geheader NoData) attrs
+
 
 familyIdRequest :: String -> CTRLPacket
 familyIdRequest name = let
