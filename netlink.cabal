@@ -62,7 +62,7 @@ executable dump_nl80211
   build-depends: base >=4.6 && <5,
                  netlink
   default-language: Haskell2010
-  ghc-options: -Wall -O2
+  ghc-options: -Wall
 
 executable genlinfo
   hs-source-dirs: Utils
@@ -70,7 +70,7 @@ executable genlinfo
   build-depends: base >=4.6 && <5,
                  netlink
   default-language: Haskell2010
-  ghc-options: -Wall -O2
+  ghc-options: -Wall
 
 executable dump_rtnetlink
   hs-source-dirs: Utils
@@ -78,7 +78,7 @@ executable dump_rtnetlink
   build-depends: base >=4.6 && <5,
                  netlink
   default-language: Haskell2010
-  ghc-options: -Wall -O2
+  ghc-options: -Wall
 
 
 Library
@@ -103,5 +103,5 @@ Library
                      pretty-hex
   Ghc-options:       -Wall -fwarn-tabs
   if impl(ghc < 7.10)
-    ghc-options:     -XOverlappingInstances
+    default-extensions:     OverlappingInstances
   Ghc-prof-options:  -auto-all
