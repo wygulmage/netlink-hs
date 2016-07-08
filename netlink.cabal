@@ -104,4 +104,4 @@ Library
   Ghc-options:       -Wall -fwarn-tabs
   if impl(ghc < 7.10)
     default-extensions:     OverlappingInstances
-  Ghc-prof-options:  -auto-all
+  --Ghc-prof-options:  -auto-all

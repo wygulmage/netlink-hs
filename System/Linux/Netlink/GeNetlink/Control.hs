@@ -233,10 +233,12 @@ getFamilyWithMulticasts s m = do
   return $fromMaybe (error "Could not find family") may
 
 
+-- |Get the 'CtrlPacket' describing a single family
 getFamilie :: NetlinkSocket -> String -> IO (Maybe CtrlPacket)
 getFamilie sock name =
   ctrlPacketFromGenl <$> queryOne sock (familyIdRequest name)
 
+-- |Get 'CtrlPacket's for every currently registered GeNetlink family
 getFamilies :: NetlinkSocket -> IO [CtrlPacket]
 getFamilies sock = do
   mapMaybe ctrlPacketFromGenl <$> query sock familiesRequest

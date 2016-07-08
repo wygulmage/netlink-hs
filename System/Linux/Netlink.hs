@@ -157,6 +157,7 @@ showAttrs sh = showAttrs' . toList
     showAttrs' [] = []
     showAttrs' (x:xs) = showAttr sh x ++ showAttrs' xs
 
+-- |Helper function to generically show a single attribute
 showAttr :: (Int -> String) -> (Int, ByteString) -> String
 showAttr sh (i,v) = sh i ++ ": " ++ prettyHex v
 

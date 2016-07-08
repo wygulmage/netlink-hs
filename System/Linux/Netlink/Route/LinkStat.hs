@@ -1,4 +1,11 @@
 {-# LANGUAGE CPP #-}
+{-|
+Module      : System.Linux.Netlink.Route.LinkStat
+Description : The implementation for netlinks route linkstat portion
+Maintainer  : ongy
+Stability   : testing
+Portability : Linux
+-}
 module System.Linux.Netlink.Route.LinkStat
   ( LinkStat
   , getLinkStat64

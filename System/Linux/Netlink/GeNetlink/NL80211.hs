@@ -151,6 +151,7 @@ joinMulticastByName (NLS sock _) name = do
     Just x -> joinMulticastGroup sock x
 
 
+-- |Get the names of all multicast groups this nl80211 implementation provides
 getMulticastGroups :: NL80211Socket -> IO [String]
 getMulticastGroups (NLS sock fid) =
   map grpName <$> C.getMulticastGroups sock fid
