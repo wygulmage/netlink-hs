@@ -6,7 +6,6 @@ import Data.List (intersperse, isInfixOf)
 import Data.Map (Map, keys)
 import System.Environment (getArgs)
 
-
 import Helpers
 
 main :: IO ()
@@ -34,13 +33,15 @@ outputs _ e = let {-define r = selectDefines r d-}
        , mkEnum "NL80211Bss" . bssenum $selectEnums "^NL80211_BSS_" e
        , mkEnum "Nl80211StaInfo" $ enum "^NL80211_STA_INFO_"
        , mkEnum "IEEE80211EID" $ enum "^WLAN_EID_"
+       , mkEnum "NL80211RateInfo" $ enum "^NL80211_RATE_INFO_"
        ]
 
-  where bssenum = getFirst . noChanWidth . noBssStatus
+  where bssenum = getFirst . noChanWidth . noBssStatus . noBssSelect
         getFirst (x:_) = x
         getFirst [] = error "Couldn't find the bssenum enum in files"
         noChanWidth = filter (all (not . isInfixOf "CHAN_WIDTH_") . keys)
         noBssStatus = filter (all (not . isInfixOf "BSS_STATUS_") . keys)
+        noBssSelect = filter (all (not . isInfixOf "BSS_SELECT_") . keys)
 
 includeFiles :: [String]
 includeFiles = [ "linux/nl80211.h" ]
