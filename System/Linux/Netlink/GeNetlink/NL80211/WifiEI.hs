@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 module System.Linux.Netlink.GeNetlink.NL80211.WifiEI
     ( showWifiEid
     , getWifiEIDs
@@ -12,6 +13,11 @@ import Data.Serialize.Get (runGet, getByteString, getWord8, isEmpty, Get)
 import Control.Monad.Loops (whileM)
 
 import System.Linux.Netlink.GeNetlink.NL80211.Constants
+
+#if MIN_VERSION_base(4,8,0)
+#else
+import Control.Applicative ((<$>))
+#endif
 
 getRight :: Show a => Either a b -> b
 getRight (Right x) = x
