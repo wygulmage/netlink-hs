@@ -1,5 +1,5 @@
 Name:                netlink
-Version:             1.0.0.4
+Version:             1.1.0.0
 Synopsis:            Netlink communication for Haskell
 Description:         Library to comminicate with Linux kernel via Netlink
 Homepage:            https://github.com/Ongy/netlink-hs
@@ -16,45 +16,6 @@ Cabal-version:       >=1.10
 Source-repository head
   type:       git
   location:   https://github.com/Ongy/netlink-hs
-
-
-{- Uncomment to build the generator executables
-executable generate
-  hs-source-dirs: Scripts
-  main-is: Generate.hs
-  default-language: Haskell2010
-  ghc-options: -Wall -O2
-  other-modules: Helpers
-  build-depends: base,
-                 containers,
-                 process,
-                 language-c,
-                 regex-pcre
-
-executable generategenl
-  hs-source-dirs: Scripts
-  main-is: GenerateGenl.hs
-  default-language: Haskell2010
-  ghc-options: -Wall -O2
-  other-modules: Helpers
-  build-depends: base,
-                 containers,
-                 process,
-                 language-c,
-                 regex-pcre
-
-executable generatenl80211
-  hs-source-dirs: Scripts
-  main-is: GenerateNL80211.hs
-  default-language: Haskell2010
-  ghc-options: -Wall -O2
-  other-modules: Helpers
-  build-depends: base,
-                 containers,
-                 process,
-                 language-c,
-                 regex-pcre
--}
 
 executable dump_nl80211
   hs-source-dirs: Utils
@@ -92,6 +53,8 @@ Library
                      System.Linux.Netlink.GeNetlink.Control
                      System.Linux.Netlink.GeNetlink.NL80211
                      System.Linux.Netlink.GeNetlink.NL80211.Constants
+                     System.Linux.Netlink.GeNetlink.NL80211.StaInfo
+                     System.Linux.Netlink.GeNetlink.NL80211.WifiEI
   Other-modules:     System.Linux.Netlink.C
   default-language: Haskell2010
   Build-depends:     base >=4 && <5,

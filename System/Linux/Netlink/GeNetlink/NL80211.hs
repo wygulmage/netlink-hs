@@ -14,7 +14,6 @@ For more information see /usr/include/linux/nl80211.h
 module System.Linux.Netlink.GeNetlink.NL80211
   ( NL80211Socket
   , NL80211Packet
-  , getWifiEIDs
 
   , makeNL80211Socket
   , joinMulticastByName
@@ -35,12 +34,11 @@ where
 import Control.Applicative ((<$>))
 #endif
 
-import Control.Monad.Loops (whileM)
 import Data.Bits ((.|.))
 import Data.ByteString.Char8 (unpack)
 import Data.List (intercalate)
 import Data.Maybe (mapMaybe)
-import Data.Serialize.Get (runGet, getByteString, getWord8 ,getWord32host, isEmpty, Get)
+import Data.Serialize.Get (runGet, getWord32host)
 import Data.Serialize.Put (runPut, putWord32host)
 import Data.Word (Word32, Word16, Word8)
 
@@ -56,6 +54,8 @@ import System.Linux.Netlink.GeNetlink
 import System.Linux.Netlink.GeNetlink.Control hiding (getMulticastGroups)
 import qualified System.Linux.Netlink.GeNetlink.Control as C
 import System.Linux.Netlink.GeNetlink.NL80211.Constants
+import System.Linux.Netlink.GeNetlink.NL80211.StaInfo
+import System.Linux.Netlink.GeNetlink.NL80211.WifiEI
 import System.Linux.Netlink hiding (makeSocket, queryOne, query, recvOne, getPacket)
 import qualified System.Linux.Netlink as I (queryOne, query, recvOne)
 
@@ -93,13 +93,8 @@ showNL80211Attr (i, v)
 
 showStaInfo :: ByteString -> String
 showStaInfo bs = let attrs = getRight $ runGet getAttributes bs in
-  "NL80211_ATTR_STA_INFO: " ++ show (BS.length bs) ++ "\n" ++
-  (indent $showAttrs showNl80211StaInfo attrs)
-
-showWifiEid :: ByteString -> String
-showWifiEid bs = let attrs = getRight $ runGet getWifiEIDs bs in
-  "WifiEIDs:\n" ++
-  (indent $showAttrs showIEEE80211EID attrs)
+    "NL80211_ATTR_STA_INFO: " ++ show (BS.length bs) ++ "\n" ++
+    (indent . show . staInfoFromAttributes $ attrs)
 
 showAttrBss :: ByteString -> String
 showAttrBss bs = let attrs = getRight $ runGet getAttributes bs in
@@ -115,18 +110,6 @@ showBssAttr (i, v)
 -- |Get the raw fd from a 'NL80211Socket'. This can be used for eventing
 getFd :: NL80211Socket -> Fd
 getFd (NLS s _) = getNetlinkFd s
-
--- |'Get' the EID Attributes from a buffer
-getWifiEIDs :: Get Attributes
-getWifiEIDs = M.fromList <$> whileM (not <$> isEmpty) getWifiEID
-
--- |'Get' an EID attribute from a buffer
-getWifiEID :: Get (Int, ByteString)
-getWifiEID = do
-  ty  <- fromIntegral <$> getWord8
-  len <- fromIntegral <$> getWord8
-  val <- getByteString len
-  return (ty, val)
 
 getRight :: Show a => Either a b -> b
 getRight (Right x) = x
@@ -240,8 +223,7 @@ getConnectedWifi sock ifindex = filter isConn <$> getScanResults sock ifindex
 
 -- |Get the EID attributes from a 'NL80211Packet' (for example from 'getConnectedWifi'
 getWifiAttributes :: NL80211Packet -> Maybe Attributes
-getWifiAttributes (Packet _ _ attrs) =
-  getRight <$> runGet getWifiEIDs <$> eids
+getWifiAttributes (Packet _ _ attrs) = getRight <$> runGet getWifiEIDs <$> eids
   where bssattrs = getRight . runGet getAttributes <$> M.lookup eNL80211_ATTR_BSS attrs
         eids = M.lookup eNL80211_BSS_INFORMATION_ELEMENTS =<< bssattrs
 getWifiAttributes x@(ErrorMsg{}) = error ("Something stupid happened" ++ show x)
