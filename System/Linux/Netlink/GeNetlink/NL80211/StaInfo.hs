@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 module System.Linux.Netlink.GeNetlink.NL80211.StaInfo
     ( StaInfo (..)
     , SignalWidth (..)
@@ -24,6 +25,11 @@ import System.Linux.Netlink.GeNetlink.NL80211.Constants
 import Data.Word
 
 import Data.Serialize.Get
+
+#if MIN_VERSION_base(4,8,0)
+#else
+import Control.Applicative ((<$>))
+#endif
 
 newtype Signal = Signal [Word8] deriving (Show, Eq, Read)
 
