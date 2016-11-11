@@ -73,16 +73,16 @@ data StaRate = StaRate
     { -- |This will be reported as Word16/Word32 from the kernel. We read it into one value.
       -- |If this is Nothing, mcs is >= 32 looking at the code, so it *should*
       -- |never be Nothing.
-      rateBitrate  :: Maybe Word32
-    , rateRateFlag :: SignalWidth
-    , rateMCS      :: Maybe Word8
+      rateBitrate   :: Maybe Word32
+    , rateWidthFlag :: SignalWidth
+    , rateMCS       :: Maybe Word8
     -- Hm
-    , rateShortGI  :: Bool
+    , rateShortGI   :: Bool
 
-    , rateVHTMCS   :: Maybe Word8
-    , rateVHTNSS   :: Maybe Word8
+    , rateVHTMCS    :: Maybe Word8
+    , rateVHTNSS    :: Maybe Word8
 
-    , rateSelf     :: Attributes
+    , rateSelf      :: Attributes
     } deriving (Show, Eq, Read)
 
 staRateFromAttributes :: Attributes -> StaRate
