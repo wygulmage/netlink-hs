@@ -1,4 +1,14 @@
 {-# LANGUAGE CPP #-}
+{-|
+Module      : System.Linux.Netlink.GeNetlink.NL80211.WifiEI
+Description : Implementation of NL80211
+Maintainer  : ongy
+Stability   : testing
+Portability : Linux
+
+This module providis utility functions for NL80211 subsystem.
+In particular the IEEE80211 WifiEI part of NL80211.
+-}
 module System.Linux.Netlink.GeNetlink.NL80211.WifiEI
     ( showWifiEid
     , getWifiEIDs
@@ -23,7 +33,7 @@ getRight :: Show a => Either a b -> b
 getRight (Right x) = x
 getRight (Left err) = error $show err
 
-
+-- |Prettyprint the WifiEid map
 showWifiEid :: ByteString -> String
 showWifiEid bs = let attrs = getRight $ runGet getWifiEIDs bs in
   "WifiEIDs:\n" ++

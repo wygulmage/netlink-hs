@@ -1,4 +1,15 @@
 {-# LANGUAGE CPP #-}
+{-|
+Module      : System.Linux.Netlink.GeNetlink.NL80211.StaInfo
+Description : Implementation of NL80211
+Maintainer  : ongy
+Stability   : testing
+Portability : Linux
+
+This module providis utility functions for NL80211 subsystem.
+In particular the NL80211_ATTR_STA_INFO part of NL80211.
+For more information see /usr/include/linux/nl80211.h
+-}
 module System.Linux.Netlink.GeNetlink.NL80211.StaInfo
     ( StaInfo (..)
     , SignalWidth (..)
@@ -31,6 +42,7 @@ import Data.Serialize.Get
 import Control.Applicative ((<$>))
 #endif
 
+-- |Type for "chain signal"
 newtype Signal = Signal [Word8] deriving (Show, Eq, Read)
 
 -- |Get a Signal from the nested attributes.
@@ -69,6 +81,7 @@ widthFromAttributes attrs =
     where opt :: SignalWidth -> Int -> Maybe SignalWidth
           opt c e = fmap (const c) . M.lookup e $ attrs
 
+-- |Type for the rate attributes in StaInfo
 data StaRate = StaRate
     { -- |This will be reported as Word16/Word32 from the kernel. We read it into one value.
       -- |If this is Nothing, mcs is >= 32 looking at the code, so it *should*
@@ -76,7 +89,6 @@ data StaRate = StaRate
       rateBitrate   :: Maybe Word32
     , rateWidthFlag :: SignalWidth
     , rateMCS       :: Maybe Word8
-    -- Hm
     , rateShortGI   :: Bool
 
     , rateVHTMCS    :: Maybe Word8
@@ -85,6 +97,7 @@ data StaRate = StaRate
     , rateSelf      :: Attributes
     } deriving (Show, Eq, Read)
 
+-- |Get the StaRate from a parsed nested Attribute
 staRateFromAttributes :: Attributes -> StaRate
 staRateFromAttributes attrs =
     let rate16 = getField getWord16host eNL80211_RATE_INFO_BITRATE
@@ -116,7 +129,6 @@ data StaInfo = StaInfo
     , staTXBytes    :: Maybe Word64
     , staLLID       :: Maybe Word16
     , staPLID       :: Maybe Word16
-    -- |TODO: Is this a enum? Could be a bit better.
     , staPLState    :: Maybe Word8
     , staRXDur      :: Maybe Word64
     , staSignalMBM  :: Maybe Word8
@@ -130,7 +142,6 @@ data StaInfo = StaInfo
     , staTXPackets  :: Maybe Word32
     , staTXRetries  :: Maybe Word32
     , staTXFailed   :: Maybe Word32
-    -- |Expected throughput. TODO: Can we use this?
     , staExpectTP   :: Maybe Word32
     , staBeaconLoss :: Maybe Word32
 
@@ -155,6 +166,7 @@ data StaInfo = StaInfo
     , staSelf       :: Attributes
     } deriving (Show, Eq, Read)
 
+-- |Parse the nested Netlink Attributes into an StaInfo
 staInfoFromAttributes :: Attributes -> StaInfo
 staInfoFromAttributes attrs =
     let conTime = getField getWord32host eNL80211_STA_INFO_CONNECTED_TIME
@@ -212,9 +224,11 @@ staInfoFromAttributes attrs =
           getRight (Right x) = x
           getRight (Left x)  = error $ "Failed to parse something in StaInfo: " ++ x
 
+-- |'Get' an StaInfo from a Bytestring
 getStaInfo :: Get StaInfo
 getStaInfo = fmap staInfoFromAttributes getAttributes
 
+-- |extract the StaInfo from a Packet. Use with caution.
 staInfoFromPacket :: Packet a -> Maybe StaInfo
 staInfoFromPacket (Packet _ _ attrs) =
     let y = runGet getStaInfo <$> M.lookup eNL80211_ATTR_STA_INFO attrs
@@ -222,4 +236,4 @@ staInfoFromPacket (Packet _ _ attrs) =
     where getRight (Right x) = x
           getRight (Left x)  = error $ "Failed to decode staInfo: " ++ x
 staInfoFromPacket _ = Nothing
--- This eats an error packet, fix?
+-- TODO:This eats error packets, fix?
