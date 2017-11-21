@@ -20,6 +20,7 @@ Source-repository head
 Flag Generators
   description: Build the generator scripts for constants
   default: False
+  manual: True
 
 executable dump_nl80211
   hs-source-dirs: Utils
