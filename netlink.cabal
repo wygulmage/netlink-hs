@@ -17,6 +17,11 @@ Source-repository head
   type:       git
   location:   https://github.com/Ongy/netlink-hs
 
+Flag Generators
+  description: Build the generator scripts for constants
+  default: False
+  manual: True
+
 executable dump_nl80211
   hs-source-dirs: Utils
   main-is: DumpNL80211.hs
@@ -41,6 +46,53 @@ executable dump_rtnetlink
   default-language: Haskell2010
   ghc-options: -Wall
 
+executable Generate
+  if flag(Generators)
+    Buildable: True
+  else
+    Buildable: False
+  hs-source-dirs: Scripts
+  main-is: Generate.hs
+  other-modules: Helpers
+  default-language: Haskell2010
+  ghc-options: -Wall
+  build-depends: base >=4.6 && <5,
+                 language-c <0.7,
+                 containers,
+                 process,
+                 regex-pcre
+
+executable GenerateGenl
+  if flag(Generators)
+    Buildable: True
+  else
+    Buildable: False
+  hs-source-dirs: Scripts
+  main-is: GenerateGenl.hs
+  other-modules: Helpers
+  default-language: Haskell2010
+  ghc-options: -Wall
+  build-depends: base >=4.6 && <5,
+                 language-c <0.7,
+                 containers,
+                 process,
+                 regex-pcre
+
+executable GenerateNL80211
+  if flag(Generators)
+    Buildable: True
+  else
+    Buildable: False
+  hs-source-dirs: Scripts
+  main-is: GenerateNL80211.hs
+  other-modules: Helpers
+  default-language: Haskell2010
+  ghc-options: -Wall
+  build-depends: base >=4.6 && <5,
+                 language-c <0.7,
+                 containers,
+                 process,
+                 regex-pcre
 
 Library
   Exposed-modules:   System.Linux.Netlink
