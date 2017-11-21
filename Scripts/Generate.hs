@@ -45,7 +45,8 @@ outputs d e = let define r = selectDefines r d
      mkEnum "RouteProto"    $ define "^RTPROT_",
      mkEnum "RouteType"     $ enum   "^RTN_",
      mkFlag "RouteFlags"    $ define "^RTM_F_",
-     mkEnum "RouteAttrType" $ enum   "^RTA_"]
+     mkEnum "RouteAttrType" $ enum   "^RTA_",
+     mkEnum "NeighAttrType" $ enum   "^NDA_"]
 
 includeFiles :: [String]
 includeFiles = [ "sys/types.h"
@@ -56,5 +57,6 @@ includeFiles = [ "sys/types.h"
                , "linux/if_link.h"
                , "linux/netlink.h"
                , "linux/rtnetlink.h"
+               , "linux/neighbour.h"
                ]
 

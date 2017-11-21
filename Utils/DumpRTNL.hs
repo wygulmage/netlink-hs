@@ -15,6 +15,7 @@ main :: IO ()
 main = do
   sock <- makeSocket
   putStrLn "Opened socket"
-  joinMulticastGroup sock 1
+  joinMulticastGroup sock 1 -- RTNLGRP_LINK
+  joinMulticastGroup sock 3 -- RTNLGRP_NEIGH
   putStrLn "Joined multicast group"
   printLoop sock

@@ -119,27 +119,6 @@ showMsgAttr msgType
   | msgType == eRTM_GETNEIGH = showNeighAttr
   | otherwise = showLinkAttr --default to original behavior
 
--- attributs of eRTM_NEWNEIGH, eRTM_DELNEIGH, eRTM_GETNEIGH messages
-eNDA_UNSPEC :: Num a => a
-eNDA_UNSPEC = 0
-eNDA_DST :: Num a => a
-eNDA_DST = 1
-eNDA_LLADDR :: Num a => a
-eNDA_LLADDR = 2
-eNDA_CACHEINFO :: Num a => a
-eNDA_CACHEINFO = 3
-eNDA_PROBES :: Num a => a
-eNDA_PROBES = 4
-
-showNeighAttrType :: Int -> String
-showNeighAttrType i
-  | i == eNDA_DST = "NDA_DST"
-  | i == eNDA_LLADDR = "NDA_LLADDR"
-  | i == eNDA_UNSPEC = "eNDA_UNSPEC"
-  | i == eNDA_CACHEINFO = "eNDA_CACHEINFO"
-  | i == eNDA_PROBES = "eNDA_PROBES"
-  | otherwise = show i
-
 showNeighAttr :: (Int, ByteString) -> String
 showNeighAttr = showAttr showNeighAttrType
 
