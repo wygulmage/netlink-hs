@@ -39,7 +39,7 @@ import Prelude hiding (length, lookup, init)
 
 #if MIN_VERSION_base(4,8,0)
 #else
-import Control.Applicative ((<$>))
+import Control.Applicative ((<$>), (<*>))
 #endif
 
 import qualified Data.ByteString as BS (length)
@@ -49,7 +49,8 @@ import Data.List (intersperse)
 import Data.Map (insert, lookup, toList)
 import Data.Serialize.Get
 import Data.Serialize.Put
-import Data.Word (Word8, Word32)
+import Data.Word (Word8, Word16, Word32)
+import Data.Int (Int32)
 
 import System.Linux.Netlink.Constants
 import System.Linux.Netlink
@@ -70,6 +71,13 @@ data Message = NLinkMsg
     , addrFlags          :: Word8
     , addrScope          :: Word8
     , addrInterfaceIndex :: Word32
+    } 
+             | NNeighMsg
+    { neighFamily  :: Word8
+    , neighIfindex :: Int32
+    , neighState   :: Word16
+    , neighFlags   :: Word8
+    , neighType    :: Word8
     } deriving (Eq)
 
 instance Show Message where
@@ -78,6 +86,9 @@ instance Show Message where
   show (NAddrMsg f l fl s i) =
     "AddrMessage. Family: " ++ show f ++ ", MLength: " ++ show l ++ ", Flags: " ++ 
     show fl ++ ", Scope: " ++ show s ++ ", Index: " ++ show i
+  show (NNeighMsg f i s fl t) =
+    "NeighMessage. Family: " ++ show f ++ ", Index: " ++ show i ++ ", State: " ++ 
+    show s ++ ", Flags: " ++ show fl ++ ", Type: " ++ show t
 
 instance Convertable Message where
   getGet = getMessage
@@ -97,9 +108,19 @@ instance Show RoutePacket where
     "RoutePacket: " ++ showRouteHeader hdr ++ "\n" ++
     show cus ++ "\n" ++
     --TODO: is this the case every time? maybe match on other to get which enum to use
-    "Attrs: \n" ++ concatMap showLinkAttr (toList attrs) ++ "\n"
+    "Attrs: \n" ++ concatMap (showMsgAttr (messageType hdr)) (toList attrs) ++ "\n"
   show p = showPacket p
 
+
+showMsgAttr :: MessageType -> (Int, ByteString) -> String
+showMsgAttr msgType
+  | msgType == eRTM_NEWNEIGH = showNeighAttr
+  | msgType == eRTM_DELNEIGH = showNeighAttr
+  | msgType == eRTM_GETNEIGH = showNeighAttr
+  | otherwise = showLinkAttr --default to original behavior
+
+showNeighAttr :: (Int, ByteString) -> String
+showNeighAttr = showAttr showNeighAttrType
 
 showLinkAttr :: (Int, ByteString) -> String
 showLinkAttr (i, v)
@@ -143,6 +164,11 @@ getMessage msgtype | msgtype == eRTM_NEWLINK = getMessageLink
                    | msgtype == eRTM_NEWADDR = getMessageAddr
                    | msgtype == eRTM_GETADDR = getMessageAddr
                    | msgtype == eRTM_DELADDR = getMessageAddr
+
+                   | msgtype == eRTM_GETNEIGH = getMessageNeigh
+                   | msgtype == eRTM_NEWNEIGH = getMessageNeigh
+                   | msgtype == eRTM_DELNEIGH = getMessageNeigh
+
                    | otherwise               =
                        error $ "Can't decode message " ++ show msgtype
 
@@ -164,6 +190,14 @@ getMessageAddr = do
     idx <- g32
     return $ NAddrMsg fam maskLen flags scope idx
 
+getMessageNeigh :: Get Message
+getMessageNeigh = NNeighMsg
+    <$> g8
+    <*> (skip 3 >> fromIntegral <$> g32)
+    <*> g16
+    <*> g8
+    <*> g8
+
 putMessage :: Message -> Put
 putMessage (NLinkMsg ty idx flags) = do
     p8 eAF_UNSPEC >> p8 0
@@ -177,6 +211,13 @@ putMessage (NAddrMsg fam maskLen flags scope idx) = do
     p8 flags
     p8 (fromIntegral scope)
     p32 idx
+putMessage (NNeighMsg f i s fl t) = do
+    p8 f
+    p8 0 >> p8 0 >> p8 0 --padding
+    p32 (fromIntegral i)
+    p16 s
+    p8 fl
+    p8 t
 
 -- |'Get' a route message or an error
 getRoutePackets :: ByteString -> Either String [RoutePacket]
