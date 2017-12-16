@@ -56,11 +56,13 @@ executable Generate
   other-modules: Helpers
   default-language: Haskell2010
   ghc-options: -Wall
-  build-depends: base >=4.6 && <5,
-                 language-c <0.7,
-                 containers,
-                 process,
-                 regex-pcre
+
+  if flag(Generators)
+    build-depends: base >=4.6 && <5,
+                   language-c <0.7,
+                   containers,
+                   process,
+                   regex-pcre
 
 executable GenerateGenl
   if flag(Generators)
@@ -72,11 +74,12 @@ executable GenerateGenl
   other-modules: Helpers
   default-language: Haskell2010
   ghc-options: -Wall
-  build-depends: base >=4.6 && <5,
-                 language-c <0.7,
-                 containers,
-                 process,
-                 regex-pcre
+  if flag(Generators)
+    build-depends: base >=4.6 && <5,
+                   language-c <0.7,
+                   containers,
+                   process,
+                   regex-pcre
 
 executable GenerateNL80211
   if flag(Generators)
@@ -88,11 +91,12 @@ executable GenerateNL80211
   other-modules: Helpers
   default-language: Haskell2010
   ghc-options: -Wall
-  build-depends: base >=4.6 && <5,
-                 language-c <0.7,
-                 containers,
-                 process,
-                 regex-pcre
+  if flag(Generators)
+    build-depends: base >=4.6 && <5,
+                   language-c <0.7,
+                   containers,
+                   process,
+                   regex-pcre
 
 Library
   Exposed-modules:   System.Linux.Netlink
