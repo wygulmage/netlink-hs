@@ -65,7 +65,7 @@ data Message = NLinkMsg
     {
       interfaceType  :: LinkType
     , interfaceIndex :: Word32
-    , interfaceFlags :: Word32 -- ^ System.Linux.Netlink.fIFF_* flags
+    , interfaceFlags :: Word32 -- ^ System.Linux.Netlink.Constants.fIFF_* flags
     }
              | NAddrMsg
     {
@@ -76,9 +76,9 @@ data Message = NLinkMsg
     , addrInterfaceIndex :: Word32
     } 
              | NNeighMsg
-    { neighFamily  :: Word8 -- ^ One of System.Linux.Netlink.eAF_* values
+    { neighFamily  :: Word8 -- ^ One of System.Linux.Netlink.Constants.eAF_* values
     , neighIfindex :: Int32
-    , neighState   :: Word16 -- ^ System.Linux.Netlink.fNUD_* flags
+    , neighState   :: Word16 -- ^ System.Linux.Netlink.Constants.fNUD_* flags
     , neighFlags   :: Word8
     , neighType    :: Word8
     } deriving (Eq)
