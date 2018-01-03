@@ -33,11 +33,9 @@ module System.Linux.Netlink
   , getNetlinkFd
   , closeSocket
   , joinMulticastGroup
-  , setBufferSize
 
   , query
   , queryOne
-  , sendOne
   , recvOne
   , showNLAttrs
   , showAttrs
@@ -312,13 +310,6 @@ joinMulticastGroup
   -> IO ()
 joinMulticastGroup (NS fd) = C.joinMulticastGroup fd
 
--- |Set size of netlink receive buffer
-setBufferSize
-  :: NetlinkSocket
-  -> Word32
-  -> IO ()
-setBufferSize (NS fd) sz = C.setBufferSize fd $ fromIntegral sz
-
 
 
 -- generic query functions
@@ -340,11 +331,6 @@ queryOne sock req = do
     case pkts of
       [x] -> return x
       _ -> fail ("Expected one packet, received " ++ (show . length $pkts))
-
--- |Send single message
-sendOne :: (Convertable a, Eq a, Show a) => NetlinkSocket -> Packet a -> IO ()
-sendOne sock req = sendmsg sock (putPacket req)
-
 
 -- |Internal function to receive multiple netlink messages
 recvMulti :: (Convertable a, Eq a, Show a) => NetlinkSocket -> IO [Packet a]

@@ -16,7 +16,6 @@ module System.Linux.Netlink.C
     , sendmsg
     , recvmsg
     , joinMulticastGroup
-    , setBufferSize
     )
 where
 
@@ -161,15 +160,6 @@ zero p = void $ c_memset (castPtr p) 0 (sizeOfPtr p)
 void :: Monad m => m a -> m ()
 void act = act >> return ()
 
-so_rcvbuf :: CInt
-so_rcvbuf = #const SO_RCVBUF
-
-setBufferSize :: CInt -> CInt -> IO ()
-setBufferSize fd sz = do
-  _ <- throwErrnoIfMinus1 "setBufferSize" $ with sz (\ptr ->
-    c_setsockopt fd sol_netlink so_rcvbuf (castPtr ptr) size >>= \ rc -> print (fd, sz, rc) >> return rc)
-  return ()
-  where size = fromIntegral $sizeOf (undefined :: CInt)
 
 -- |Join a netlink multicast group
 joinMulticastGroup :: CInt -> Word32 -> IO ()
@@ -178,7 +168,4 @@ joinMulticastGroup fd fid = do
     c_setsockopt fd sol_netlink 1 (castPtr ptr) size)
   return ()
   where size = fromIntegral $sizeOf (undefined :: CInt)
-
-sol_netlink :: CInt
-sol_netlink = #const SOL_NETLINK
-
+        sol_netlink = 270 :: CInt
