@@ -26,6 +26,9 @@ module System.Linux.Netlink.Route
     , getLinkMTU
     , getLinkQDisc
     , getLinkTXQLen
+    , getIFAddr
+    , getLLAddr
+    , getDstAddr
 
     , putLinkAddress
     , putLinkBroadcast
@@ -294,6 +297,18 @@ putLinkTXQLen len = insert eIFLA_TXQLEN (put32 len)
 -- TODO: IFLA_{LINKMODE,LINKINFO} - see Documentation/networking/operstates.txt
 
 -- TODO: IFLA_{NET_NS_PID,IFALIAS} - need to figure out
+
+-- |get interface address from netlink attributes of 'NAddrMsg'
+getIFAddr :: AttributeReader ByteString
+getIFAddr = lookup eIFA_ADDRESS
+
+-- |get L2 address from netlink attributes of 'NNeighMsg'
+getLLAddr :: AttributeReader LinkAddress
+getLLAddr attrs = decodeMAC <$> lookup eNDA_LLADDR attrs
+
+-- |get destination address from netlink attributes of 'NNeighMsg'
+getDstAddr :: AttributeReader ByteString
+getDstAddr = lookup eNDA_DST
 
 --
 -- Helpers
