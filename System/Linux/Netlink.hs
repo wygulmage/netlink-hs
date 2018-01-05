@@ -306,7 +306,7 @@ closeSocket (NS fd) = C.closeSocket fd
 -- |Join a netlink multicast group
 joinMulticastGroup
   :: NetlinkSocket -- ^The socket to join with
-  -> Word32  -- ^The id of the group to join
+  -> Word32  -- ^The id of the group to join, values of System.Linux.Netlink.Constants.eRTNLGRP_*
   -> IO ()
 joinMulticastGroup (NS fd) = C.joinMulticastGroup fd
 
