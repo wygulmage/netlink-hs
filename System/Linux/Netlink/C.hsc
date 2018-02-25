@@ -169,3 +169,8 @@ joinMulticastGroup fd fid = do
   return ()
   where size = fromIntegral $sizeOf (undefined :: CInt)
         sol_netlink = 270 :: CInt
+
+-- |Leave a netlink multicast group
+leaveMulticastGroup = error "leaveMulticastGroup: TODO" --this seem like good to way to handle enobuf situations
+
+
