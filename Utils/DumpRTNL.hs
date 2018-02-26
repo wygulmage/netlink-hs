@@ -3,6 +3,7 @@ where
 
 import System.Linux.Netlink
 import System.Linux.Netlink.Route
+import System.Linux.Netlink.Constants
 
 printLoop :: NetlinkSocket -> IO ()
 printLoop sock = do
@@ -15,6 +16,7 @@ main :: IO ()
 main = do
   sock <- makeSocket
   putStrLn "Opened socket"
-  joinMulticastGroup sock 1
+  joinMulticastGroup sock eRTNLGRP_LINK
+  joinMulticastGroup sock eRTNLGRP_NEIGH
   putStrLn "Joined multicast group"
   printLoop sock
