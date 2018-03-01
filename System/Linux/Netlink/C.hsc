@@ -16,6 +16,7 @@ module System.Linux.Netlink.C
     , sendmsg
     , recvmsg
     , joinMulticastGroup
+    , leaveMulticastGroup
     )
 where
 
@@ -38,7 +39,7 @@ import Foreign.Marshal.Utils (with)
 import Foreign.Ptr (Ptr, castPtr, plusPtr)
 import Foreign.Storable (Storable(..))
 
-import System.Linux.Netlink.Constants (eAF_NETLINK)
+import System.Linux.Netlink.Constants (eAF_NETLINK, eNETLINK_ADD_MEMBERSHIP, eNETLINK_DROP_MEMBERSHIP)
 
 #include <unistd.h>
 #include <string.h>
@@ -161,11 +162,25 @@ void :: Monad m => m a -> m ()
 void act = act >> return ()
 
 
+-- |Set membership to netlink multicast group
+joinOrLeaveMulticastGroup :: Bool -> CInt -> Word32 -> IO ()
+joinOrLeaveMulticastGroup beMember fd fid = do
+  _ <- throwErrnoIfMinus1 "joinMulticast" $ with fid (\ptr ->
+    c_setsockopt fd sol_netlink value (castPtr ptr) size)
+  return ()
+  where
+    size = fromIntegral $sizeOf (undefined :: CInt)
+    sol_netlink = 270 :: CInt
+    value = if beMember
+      then eNETLINK_ADD_MEMBERSHIP
+      else eNETLINK_DROP_MEMBERSHIP
+
 -- |Join a netlink multicast group
 joinMulticastGroup :: CInt -> Word32 -> IO ()
-joinMulticastGroup fd fid = do
-  _ <- throwErrnoIfMinus1 "joinMulticast" $ with fid (\ptr ->
-    c_setsockopt fd sol_netlink 1 (castPtr ptr) size)
-  return ()
-  where size = fromIntegral $sizeOf (undefined :: CInt)
-        sol_netlink = 270 :: CInt
+joinMulticastGroup = joinOrLeaveMulticastGroup True
+
+-- |Leave a netlink multicast group
+leaveMulticastGroup :: CInt -> Word32 -> IO ()
+leaveMulticastGroup = joinOrLeaveMulticastGroup False
+
+

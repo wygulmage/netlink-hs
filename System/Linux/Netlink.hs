@@ -33,6 +33,7 @@ module System.Linux.Netlink
   , getNetlinkFd
   , closeSocket
   , joinMulticastGroup
+  , leaveMulticastGroup
 
   , query
   , queryOne
@@ -309,6 +310,13 @@ joinMulticastGroup
   -> Word32  -- ^The id of the group to join, values of System.Linux.Netlink.Constants.eRTNLGRP_*
   -> IO ()
 joinMulticastGroup (NS fd) = C.joinMulticastGroup fd
+
+-- |Leave a netlink multicast group
+leaveMulticastGroup
+  :: NetlinkSocket -- ^The socket to leave
+  -> Word32  -- ^The id of the group to leave, values of System.Linux.Netlink.Constants.eRTNLGRP_*
+  -> IO ()
+leaveMulticastGroup (NS fd) = C.leaveMulticastGroup fd
 
 
 
