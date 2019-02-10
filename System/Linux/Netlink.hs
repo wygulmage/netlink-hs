@@ -27,6 +27,7 @@ module System.Linux.Netlink
   , putAttributes
   , putPacket
   , getPackets
+  , getPackets'
 
   , makeSocket
   , makeSocketGeneric
@@ -38,6 +39,7 @@ module System.Linux.Netlink
   , query
   , queryOne
   , recvOne
+  , recvOne'
   , showNLAttrs
   , showAttrs
   , showAttr
@@ -233,7 +235,7 @@ getError :: (Convertable a, Eq a, Show a) => Header -> Get (Packet a)
 getError hdr = do
   code <- fromIntegral <$> getWord32host
   packet <- getGenPacket
-  return $ErrorMsg hdr code packet
+  return $ ErrorMsg hdr code packet
 
 
 -- | 'Get' the body of a packet (the 'Header' is already read from the buffer
@@ -256,16 +258,22 @@ getGenPacket = do
     (len, header) <- getHeader
     isolate len $ getGenPacketContent header
 
+{- | Read all 'Packet's from a buffer
+
+Variant of 'getPackets' that allows to handle single failed packets
+-}
+getPackets' :: (Convertable a, Eq a, Show a) => ByteString -> [Either String (Packet a)]
+getPackets' bytes = case runGetPartial getGenPacket bytes of
+    Partial _ -> [Left "Too short input for last message =.="] -- We got a
+    Fail msg _ -> Left msg : []
+    Done r bs -> Right r : getPackets' bs
 
 {- | Read all 'Packet's from a buffer
 
 The packets may have additional static data defined by the protocol.
 -}
 getPackets :: (Convertable a, Eq a, Show a) => ByteString -> Either String [Packet a]
-getPackets bytes = flip runGet bytes $ do
-    pkts <- whileM (not <$> isEmpty) getGenPacket
-    isEmpty >>= \e -> unless e $ fail "Incomplete message parse"
-    return pkts
+getPackets = sequence . getPackets'
 
 -- | Typesafe wrapper around a 'CInt' (fd)
 newtype NetlinkSocket = NS CInt
@@ -355,6 +363,13 @@ recvMulti sock = do
     isDone  = (== eNLMSG_DONE) . messageType . packetHeader
     first (x:_) = x
     first [] = error "Got empty list from recvOne in recvMulti, this shouldn't happen"
+
+{- | Calls recvmsg once and returns all received messages
+
+Safe version of recvOne
+-}
+recvOne' :: (Convertable a, Eq a, Show a) => NetlinkSocket -> IO [Either String (Packet a)]
+recvOne' sock = getPackets' <$> recvmsg sock bufferSize
 
 {- | Calls recvmsg once and returns all received messages
 
