@@ -1,4 +1,5 @@
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE LambdaCase #-}
 
 {-|
 Module      : System.Linux.Netlink
@@ -37,6 +38,7 @@ module System.Linux.Netlink
   , leaveMulticastGroup
 
   , query
+  , query'
   , queryOne
   , recvOne
   , recvOne'
@@ -339,6 +341,11 @@ query sock req = do
     sendmsg sock (putPacket req)
     recvMulti sock
 
+query' :: (Convertable a, Eq a, Show a) => NetlinkSocket -> Packet a -> IO (Either String [Packet a])
+query' sock req = do
+    sendmsg sock (putPacket req)
+    recvMulti' sock
+
 -- |The same as 'query' but requires the answer to be a single message
 queryOne :: (Convertable a, Eq a, Show a) => NetlinkSocket -> Packet a -> IO (Packet a)
 queryOne sock req = do
@@ -347,6 +354,23 @@ queryOne sock req = do
     case pkts of
       [x] -> return x
       _ -> fail ("Expected one packet, received " ++ (show . length $pkts))
+
+recvMulti' :: (Convertable a, Eq a, Show a) => NetlinkSocket -> IO (Either String [Packet a])
+recvMulti' sock =  fmap sequence (recvOne' sock) >>= \case
+    Left err -> pure $ Left err
+    Right pkts -> Right <$> do
+      if isMulti (first pkts)
+          then if isDone (last pkts)
+               -- This is fine because first would have complained before
+               then pure $ init pkts
+               else (pkts ++) <$> recvMulti sock
+          else return pkts
+  where
+    isMulti = isFlagSet fNLM_F_MULTI . messageFlags . packetHeader
+    isDone  = (== eNLMSG_DONE) . messageType . packetHeader
+    first (x:_) = x
+    first [] = error "Got empty list from recvOne in recvMulti, this shouldn't happen"
+
 
 -- |Internal function to receive multiple netlink messages
 recvMulti :: (Convertable a, Eq a, Show a) => NetlinkSocket -> IO [Packet a]
