@@ -1,5 +1,6 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 {-|
 Module      : System.Linux.Netlink
@@ -123,7 +124,7 @@ data Packet a
     {
       packetHeader     :: Header -- ^The netlink message header
     , packetError      :: CInt -- ^The error ID for this error message
-    , errorPacket      :: Packet a -- ^The offending message
+    , errorPacket      :: ByteString --Packet a -- ^The offending message
     }
         | DoneMsg -- The done message, this should usually not be seen by a user
     {
@@ -236,8 +237,9 @@ putPacket _ = error "Cannot convert this for transmission"
 getError :: (Convertable a, Eq a, Show a) => Header -> Get (Packet a)
 getError hdr = do
   code <- fromIntegral <$> getWord32host
-  packet <- getGenPacket
-  return $ ErrorMsg hdr code packet
+  content <- getBytes =<< remaining
+  -- packet <- getGenPacket
+  return $ ErrorMsg hdr code content -- packet
 
 
 -- | 'Get' the body of a packet (the 'Header' is already read from the buffer
@@ -268,6 +270,7 @@ getPackets' :: (Convertable a, Eq a, Show a) => ByteString -> [Either String (Pa
 getPackets' bytes = case runGetPartial getGenPacket bytes of
     Partial _ -> [Left "Too short input for last message =.="] -- We got a
     Fail msg _ -> Left msg : []
+    Done r "" -> pure $ Right r
     Done r bs -> Right r : getPackets' bs
 
 {- | Read all 'Packet's from a buffer
@@ -369,7 +372,7 @@ recvMulti' sock =  fmap sequence (recvOne' sock) >>= \case
     isMulti = isFlagSet fNLM_F_MULTI . messageFlags . packetHeader
     isDone  = (== eNLMSG_DONE) . messageType . packetHeader
     first (x:_) = x
-    first [] = error "Got empty list from recvOne in recvMulti, this shouldn't happen"
+    first [] = error "Got empty list from recvOne' in recvMulti', this shouldn't happen"
 
 
 -- |Internal function to receive multiple netlink messages
