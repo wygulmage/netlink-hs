@@ -22,6 +22,22 @@ Flag Generators
   default: False
   manual: True
 
+executable list-links
+  hs-source-dirs: Examples
+  main-is: ListLinks.hs
+  build-depends: base >=4.6 && <5,
+                 netlink, cereal
+  default-language: Haskell2010
+  ghc-options: -Wall
+
+executable list-addrs
+  hs-source-dirs: Examples
+  main-is: ListAddrs.hs
+  build-depends: base >=4.6 && <5,
+                 netlink, cereal
+  default-language: Haskell2010
+  ghc-options: -Wall
+
 executable dump_nl80211
   hs-source-dirs: Utils
   main-is: DumpNL80211.hs
@@ -100,6 +116,7 @@ executable GenerateNL80211
 
 Library
   Exposed-modules:   System.Linux.Netlink
+                     System.Linux.Netlink.Simple
                      System.Linux.Netlink.Constants
                      System.Linux.Netlink.Route
                      System.Linux.Netlink.Route.LinkStat

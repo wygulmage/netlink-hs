@@ -22,6 +22,9 @@ module System.Linux.Netlink
   , NoData(..)
   , NetlinkSocket
 
+  , sendPacket
+  , recvBuffer
+
   , getPacket
   , getAttributes
   , getHeader
@@ -30,6 +33,8 @@ module System.Linux.Netlink
   , putPacket
   , getPackets
   , getPackets'
+
+  , getGenPacket
 
   , makeSocket
   , makeSocketGeneric
@@ -193,7 +198,7 @@ getSingleAttribute = do
 -- |'Get' the netlink 'Header'
 getHeader :: Get (Int, Header)
 getHeader = isolate 16 $ do
-      len <- fromIntegral <$> g32
+      len    <- fromIntegral <$> g32
       ty     <- fromIntegral <$> g16
       flags  <- fromIntegral <$> g16
       seqnum <- g32
@@ -313,6 +318,9 @@ The prototype directly reflects the interface of the C functions.
 recvmsg :: NetlinkSocket -> Int -> IO ByteString
 recvmsg (NS fd) = C.recvmsg fd
 
+recvBuffer :: NetlinkSocket -> IO ByteString
+recvBuffer = flip recvmsg bufferSize
+
 -- |Close a 'NetlinkSocket' when it is no longer used
 closeSocket :: NetlinkSocket -> IO ()
 closeSocket (NS fd) = C.closeSocket fd
@@ -331,7 +339,8 @@ leaveMulticastGroup
   -> IO ()
 leaveMulticastGroup (NS fd) = C.leaveMulticastGroup fd
 
-
+sendPacket :: (Convertable a, Eq a, Show a) => NetlinkSocket -> Packet a -> IO ()
+sendPacket sock req = sendmsg sock (putPacket req)
 
 -- generic query functions
 {- |Query data over netlink.
