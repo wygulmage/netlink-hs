@@ -15,6 +15,7 @@ module System.Linux.Netlink.GeNetlink.NL80211
   ( NL80211Socket
   , NL80211Packet
 
+  , getNLSocket
   , makeNL80211Socket
   , joinMulticastByName
   , queryOne
@@ -110,6 +111,10 @@ showBssAttr (i, v)
 -- |Get the raw fd from a 'NL80211Socket'. This can be used for eventing
 getFd :: NL80211Socket -> Fd
 getFd (NLS s _) = getNetlinkFd s
+
+-- |Get the raw 'NetlinkSocket' from a 'NL80211Socket'.
+getNLSocket :: NL80211Socket -> NetlinkSocket
+getNLSocket (NLS s _) = s
 
 getRight :: Show a => Either a b -> b
 getRight (Right x) = x

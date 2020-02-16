@@ -34,6 +34,7 @@ module System.Linux.Netlink
   , getPackets
   , getPackets'
 
+  , putGenPacket
   , getGenPacket
 
   , makeSocket
@@ -69,6 +70,7 @@ import Data.Bits (Bits, (.&.))
 import qualified Data.ByteString as BS (length)
 import Data.ByteString (ByteString)
 import Data.Map (Map, fromList, toList)
+import Data.Serialize (Serialize (..))
 import Data.Serialize.Get
 import Data.Serialize.Put
 import Data.Word (Word16, Word32)
@@ -228,8 +230,17 @@ putAttributes = mapM_ putAttr . toList
         putByteString value
         when (BS.length value `mod` 4 /= 0) $replicateM_ (4 - (BS.length value `mod` 4)) (p8 0)
 
+putGenPacket :: (Convertable a) => Putter (Packet a)
+putGenPacket (Packet header custom attributes) = do
+  let attrs = runPut $ putAttributes attributes
+  let cus = runPut $ getPut custom
+  putByteString attrs
+  putByteString cus
+  putHeader (BS.length attrs + BS.length cus + 16) header
+putGenPacket _ = error "Can only put normal messages. No Done or Error for now"
+
 -- |'Put' a 'Packet' so it can e sent
-putPacket :: (Convertable a, Eq a, Show a) => Packet a -> [ByteString]
+putPacket :: (Convertable a) => Packet a -> [ByteString]
 putPacket (Packet header custom attributes) =
   let attrs = runPut $putAttributes attributes
       cus   = runPut $getPut custom
@@ -239,7 +250,7 @@ putPacket _ = error "Cannot convert this for transmission"
 
 
 -- |'Get' an error message
-getError :: (Convertable a, Eq a, Show a) => Header -> Get (Packet a)
+getError :: (Convertable a) => Header -> Get (Packet a)
 getError hdr = do
   code <- fromIntegral <$> getWord32host
   content <- getBytes =<< remaining
@@ -248,7 +259,7 @@ getError hdr = do
 
 
 -- | 'Get' the body of a packet (the 'Header' is already read from the buffer
-getGenPacketContent :: (Convertable a, Eq a, Show a) => Header -> Get (Packet a)
+getGenPacketContent :: (Convertable a) => Header -> Get (Packet a)
 getGenPacketContent hdr
   | messageType hdr == eNLMSG_DONE  = skip 4 >> return (DoneMsg hdr)
   | messageType hdr == eNLMSG_ERROR = getError hdr
@@ -262,10 +273,14 @@ getGenPacketContent hdr
 This returns a 'Get' function for a netlink message.
 The message may have additional static data defined by the protocol.
 -}
-getGenPacket :: (Convertable a, Eq a, Show a) => Get (Packet a)
+getGenPacket :: (Convertable a) => Get (Packet a)
 getGenPacket = do
     (len, header) <- getHeader
     isolate len $ getGenPacketContent header
+
+instance Convertable a => Serialize (Packet a) where
+  get = getGenPacket
+  put = putGenPacket
 
 {- | Read all 'Packet's from a buffer
 
@@ -339,7 +354,7 @@ leaveMulticastGroup
   -> IO ()
 leaveMulticastGroup (NS fd) = C.leaveMulticastGroup fd
 
-sendPacket :: (Convertable a, Eq a, Show a) => NetlinkSocket -> Packet a -> IO ()
+sendPacket :: (Convertable a) => NetlinkSocket -> Packet a -> IO ()
 sendPacket sock req = sendmsg sock (putPacket req)
 
 -- generic query functions

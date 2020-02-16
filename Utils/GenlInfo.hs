@@ -1,16 +1,19 @@
+{-# LANGUAGE LambdaCase #-}
 module Main
 where
 
+import Control.Monad (forever)
+
 import System.Environment (getArgs)
-import System.Linux.Netlink (joinMulticastGroup, recvOne, NoData, NetlinkSocket)
+import System.Linux.Netlink (joinMulticastGroup, NoData)
 import System.Linux.Netlink.GeNetlink
 import System.Linux.Netlink.GeNetlink.Control
 
+import qualified System.Linux.Netlink.Simple as NLS
 
 printMutlicastGroup :: CtrlAttrMcastGroup -> IO ()
 printMutlicastGroup grp =
   putStr "  " >> putStrLn (grpName grp)
-
 
 printFamily :: CtrlPacket -> IO ()
 printFamily pack = do
@@ -26,40 +29,38 @@ printFamily pack = do
         isMGroup (CTRL_ATTR_MCAST_GROUPS _) = True
         isMGroup _ = False
 
+printFamilyDetails :: Either String CtrlPacket -> IO ()
+printFamilyDetails (Right fam) = print fam
+printFamilyDetails (Left err) = putStrLn $ "Failed to decode family packet: " ++ err
+
+printSimple :: CTRLPacket -> (Either String CtrlPacket -> IO ()) -> IO ()
+printSimple request cb = do
+  sock <- NLS.makeSimpleNLHandle =<< makeSocket
+  NLS.nlSyncMessage sock request $ NLS.simpleSerializeCallback cb
 
 printFamilies :: IO ()
-printFamilies = do
-  sock <- makeSocket
-  fams <- getFamilies sock
-  mapM_ printFamily fams
-
+printFamilies = printSimple  familiesRequest (\case
+    Left err -> putStrLn $  "Failed to decode family packet: " ++ err
+    Right family -> printFamily family)
 
 printFamilieDetails :: String -> IO ()
-printFamilieDetails name = do
-  sock <- makeSocket
-  fam <- getFamilie sock name
-  putStrLn $show fam
+printFamilieDetails name = printSimple (familyIdRequest name)  printFamilyDetails
 
+printGeneric :: Either String (GenlPacket NoData) -> IO ()
+printGeneric (Right packet) = print packet
+printGeneric (Left err) = putStrLn $ "Failed to decode generic packet: " ++ err
 
-doDumpLoop :: NetlinkSocket -> IO ()
-doDumpLoop sock = do
-  pack <- (recvOne sock :: IO [GenlPacket NoData])
-  putStrLn $show pack
-  doDumpLoop sock
-
+handleFamily :: String -> NLS.NLHandle IO -> Either String CtrlPacket -> IO ()
+handleFamily _ _ (Left err) = putStrLn $ "Failed to decode family message: " ++ err
+handleFamily name sock (Right (CtrlPacket _ _ attrs)) = case getMulticast name $ getMCFromList attrs of
+    Nothing-> putStrLn $ "Failed to find group: " ++ name
+    Just grp -> joinMulticastGroup (NLS.nlHandleSock sock) grp
 
 dumpGeneric :: String -> String -> IO ()
 dumpGeneric fam grp = do
-  sock <- makeSocket
-  may <- getFamilyWithMulticastsS sock fam
-  case may of
-    Just (_, grps) -> do
-      let gid = getMulticast grp grps
-      case gid of
-        Just x -> joinMulticastGroup sock x >> doDumpLoop sock
-        Nothing -> error "Could not find the specified multicast group"
-    Nothing -> error "Could not find the specified family"
-
+  sock <- NLS.makeSerializeNLHandle printGeneric =<< makeSocket
+  NLS.nlSyncMessage sock (familyIdRequest fam) (NLS.simpleSerializeCallback $ handleFamily grp sock)
+  forever $ NLS.nlProcessIncoming sock
 
 main :: IO ()
 main = do

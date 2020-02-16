@@ -29,6 +29,11 @@ module System.Linux.Netlink.GeNetlink.Control
   , getMulticast
   , getFamilie
   , getFamilies
+
+  , getMCFromList
+
+  , familiesRequest
+  , familyIdRequest
   )
 where
 
@@ -38,8 +43,7 @@ import Control.Applicative ((<$>))
 #endif
 
 import Data.Bits ((.|.))
-import Data.Serialize.Get
-import Data.Serialize.Put
+import Data.Serialize
 import Data.List (intercalate)
 import Data.Map (fromList, lookup, toList, Map)
 import Data.ByteString (ByteString, append, empty)
@@ -156,6 +160,13 @@ ctrlPacketFromGenl (Packet h g attrs) = Just (CtrlPacket h (genlDataHeader g) a)
   where a = ctrlAttributesFromAttributes attrs
 ctrlPacketFromGenl _ = Nothing
 
+instance Serialize CtrlPacket where
+  get = do
+    genl <- get
+    case ctrlPacketFromGenl genl of
+      Just ret -> pure ret
+      Nothing -> fail "Failed to decode generic packet as CtrlPacket"
+  put = put . ctrlPackettoGenl
 
 putW16 :: Word16 -> ByteString
 putW16 x = runPut (putWord16host x)
@@ -232,6 +243,13 @@ getFamilyWithMulticasts s m = do
   may <- getFamilyWithMulticastsS s m
   return $fromMaybe (error "Could not find family") may
 
+familiesRequest :: CTRLPacket
+familiesRequest =
+  let header = Header 16 (fNLM_F_REQUEST .|. fNLM_F_ROOT .|. fNLM_F_MATCH) 33 0
+      geheader = GenlHeader eCTRL_CMD_GETFAMILY 0
+      attrs = fromList []
+   in Packet header (GenlData geheader NoData) attrs
+
 
 -- |Get the 'CtrlPacket' describing a single family
 getFamilie :: NetlinkSocket -> String -> IO (Maybe CtrlPacket)
@@ -240,12 +258,7 @@ getFamilie sock name =
 
 -- |Get 'CtrlPacket's for every currently registered GeNetlink family
 getFamilies :: NetlinkSocket -> IO [CtrlPacket]
-getFamilies sock = do
-  mapMaybe ctrlPacketFromGenl <$> query sock familiesRequest
-  where familiesRequest = let header = Header 16 (fNLM_F_REQUEST .|. fNLM_F_ROOT .|. fNLM_F_MATCH) 33 0
-                              geheader = GenlHeader eCTRL_CMD_GETFAMILY 0
-                              attrs = fromList [] in
-                            Packet header (GenlData geheader NoData) attrs
+getFamilies sock = mapMaybe ctrlPacketFromGenl <$> query sock familiesRequest
 
 
 -- |get the mutlicast groups of a netlink family by id
